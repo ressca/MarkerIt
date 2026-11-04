@@ -91,22 +91,22 @@ export function RegisterForm() {
         <form className="space-y-4" noValidate onSubmit={submit}>
           <div className="space-y-2">
             <Label htmlFor="register-email">{copy.email}</Label>
-            <Input id="register-email" type="email" autoComplete="email" inputMode="email" required value={values.email} aria-invalid={Boolean(fieldErrors.email)} aria-describedby={fieldErrors.email ? 'register-email-error' : undefined} onChange={(event) => updateField('email', event.target.value)} />
+            <Input className="h-11" id="register-email" type="email" autoComplete="email" inputMode="email" required value={values.email} aria-invalid={Boolean(fieldErrors.email)} aria-describedby={fieldErrors.email ? 'register-email-error' : undefined} onChange={(event) => updateField('email', event.target.value)} />
             {fieldErrors.email && <p id="register-email-error" role="alert" className="text-sm text-destructive">{errorText(fieldErrors.email)}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="register-password">{copy.password}</Label>
-            <Input id="register-password" type="password" autoComplete="new-password" required value={values.password} aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password ? 'register-password-error' : 'register-password-hint'} onChange={(event) => updateField('password', event.target.value)} />
+            <Input className="h-11" id="register-password" type="password" autoComplete="new-password" required value={values.password} aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password ? 'register-password-error' : 'register-password-hint'} onChange={(event) => updateField('password', event.target.value)} />
             <p id="register-password-hint" className="text-xs text-muted-foreground">{copy.passwordHint}</p>
             {fieldErrors.password && <p id="register-password-error" role="alert" className="text-sm text-destructive">{errorText(fieldErrors.password)}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="register-confirm-password">{copy.confirmPassword}</Label>
-            <Input id="register-confirm-password" type="password" autoComplete="new-password" required value={values.confirmPassword} aria-invalid={Boolean(fieldErrors.confirmPassword)} aria-describedby={fieldErrors.confirmPassword ? 'register-confirm-password-error' : undefined} onChange={(event) => updateField('confirmPassword', event.target.value)} />
+            <Input className="h-11" id="register-confirm-password" type="password" autoComplete="new-password" required value={values.confirmPassword} aria-invalid={Boolean(fieldErrors.confirmPassword)} aria-describedby={fieldErrors.confirmPassword ? 'register-confirm-password-error' : undefined} onChange={(event) => updateField('confirmPassword', event.target.value)} />
             {fieldErrors.confirmPassword && <p id="register-confirm-password-error" role="alert" className="text-sm text-destructive">{errorText(fieldErrors.confirmPassword)}</p>}
           </div>
           {formError && <p role="alert" className="text-sm text-destructive">{errorText(formError)}</p>}
-          <Button type="submit" className="w-full" size="lg" disabled={submitting}>
+          <Button type="submit" className="h-11 w-full" size="lg" disabled={submitting}>
             {submitting ? copy.registerSubmitting : copy.registerAction}
           </Button>
         </form>

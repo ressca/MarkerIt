@@ -17,6 +17,13 @@ export const registerAccountSchema = z
 
 export type RegisterAccountInput = z.infer<typeof registerAccountSchema>;
 
+export const loginAccountSchema = z.object({
+  email: z.string().trim().min(1, 'emailRequired').email('emailInvalid').max(320, 'emailTooLong'),
+  password: z.string().min(1, 'passwordRequired'),
+});
+
+export type LoginAccountInput = z.infer<typeof loginAccountSchema>;
+
 export const workspaceNameSchema = z.string().trim().min(1, 'Podaj nazwę workspace’u.');
 
 export const projectNameSchema = z

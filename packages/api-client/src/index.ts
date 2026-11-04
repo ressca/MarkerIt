@@ -46,6 +46,10 @@ export type RegisterAccountResponse = AuthenticatedUser & {
   createdAt: string;
 };
 
+export type LoginAccountResponse = AuthenticatedUser & {
+  expiresAt: string;
+};
+
 const defaultBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/api/v1';
 
 function isApiProblem(value: unknown): value is ApiProblem {
@@ -140,6 +144,14 @@ export async function registerAccount(
   input: { email: string; password: string },
 ): Promise<RegisterAccountResponse> {
   return apiRequest<RegisterAccountResponse>('auth/register', {
+    method: 'POST',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export async function loginAccount(input: { email: string; password: string }): Promise<LoginAccountResponse> {
+  return apiRequest<LoginAccountResponse>('auth/login', {
     method: 'POST',
     headers: await csrfHeaders(),
     body: JSON.stringify(input),
