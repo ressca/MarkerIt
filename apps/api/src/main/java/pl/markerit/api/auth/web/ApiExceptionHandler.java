@@ -1,4 +1,4 @@
-package pl.markerit.api.auth;
+package pl.markerit.api.auth.web;
 
 import java.net.URI;
 import java.util.List;
@@ -10,6 +10,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import pl.markerit.api.auth.EmailAlreadyRegisteredException;
+import pl.markerit.api.auth.InvalidCredentialsException;
+import pl.markerit.api.auth.PasswordPolicyException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {

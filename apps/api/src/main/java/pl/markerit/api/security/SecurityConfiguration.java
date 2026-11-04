@@ -1,11 +1,10 @@
-package pl.markerit.api.auth;
+package pl.markerit.api.security;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,17 +27,20 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import pl.markerit.api.auth.session.AuthSessionService;
+import pl.markerit.api.auth.session.JwtTokenService;
 
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfiguration {
 
-    static final String SESSION_COOKIE = "markerit_session";
+    public static final String SESSION_COOKIE = "markerit_session";
 
     @Bean
     SecretKey jwtSecretKey(@Value("${app.security.jwt-secret}") String secret) {

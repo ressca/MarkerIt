@@ -1,4 +1,4 @@
-package pl.markerit.api.users;
+package pl.markerit.api.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

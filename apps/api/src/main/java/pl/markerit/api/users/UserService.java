@@ -2,10 +2,10 @@ package pl.markerit.api.users;
 
 import java.nio.charset.StandardCharsets;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import pl.markerit.api.auth.EmailAlreadyRegisteredException;
-import pl.markerit.api.auth.PasswordPolicyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.markerit.api.auth.EmailAlreadyRegisteredException;
+import pl.markerit.api.auth.PasswordPolicyException;
 
 @Service
 public class UserService {

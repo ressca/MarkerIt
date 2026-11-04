@@ -1,4 +1,4 @@
-package pl.markerit.api.auth;
+package pl.markerit.api.auth.session;
 
 import java.time.Instant;
 import java.util.UUID;

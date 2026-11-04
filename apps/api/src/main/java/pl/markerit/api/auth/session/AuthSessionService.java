@@ -1,11 +1,12 @@
-package pl.markerit.api.auth;
+package pl.markerit.api.auth.session;
 
-import java.time.Instant;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.markerit.api.auth.InvalidCredentialsException;
 import pl.markerit.api.users.User;
 import pl.markerit.api.users.UserService;
 
@@ -35,6 +36,14 @@ public class AuthSessionService {
         UserSession session = sessions.save(new UserSession(UUID.randomUUID(), user, issuedAt.plus(tokenLifetime)));
         String token = jwtTokens.create(user, session, issuedAt);
         return new LoginSession(token, session.getExpiresAt(), user);
+    }
+
+    @Transactional
+    public void revoke(UUID sessionId) {
+        sessions.findById(sessionId).ifPresent(session -> {
+            session.revoke(Instant.now());
+            sessions.save(session);
+        });
     }
 
     @Transactional(readOnly = true)

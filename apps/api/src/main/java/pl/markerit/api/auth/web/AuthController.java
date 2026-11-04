@@ -1,14 +1,16 @@
-package pl.markerit.api.auth;
+package pl.markerit.api.auth.web;
 
 import jakarta.validation.Valid;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
-import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import pl.markerit.api.auth.session.AuthSessionService;
+import pl.markerit.api.security.SecurityConfiguration;
 import pl.markerit.api.users.User;
 import pl.markerit.api.users.UserService;
 
@@ -64,6 +68,19 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(new LoginResponse(session.user().getId(), session.user().getEmail(), session.expiresAt()));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal Jwt jwt) {
+        sessions.revoke(UUID.fromString(jwt.getId()));
+        ResponseCookie expiredCookie = ResponseCookie.from(SecurityConfiguration.SESSION_COOKIE, "")
+                .httpOnly(true)
+                .secure(secureCookie)
+                .sameSite("Strict")
+                .path("/")
+                .maxAge(Duration.ZERO)
+                .build();
+        return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, expiredCookie.toString()).build();
     }
 
     public record RegisteredUser(UUID id, String email, Instant createdAt) {
