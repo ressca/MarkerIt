@@ -8,6 +8,7 @@ MarkerIt is a pnpm and Nx monorepo. It contains the public landing page, the web
 - pnpm 10.33 or newer (the repository pins this version through `packageManager`)
 - JDK 21 or newer for the API
 - Gradle 8.14 or newer (or Gradle 9) for the API; no Gradle wrapper is checked in yet
+- Docker Engine and the Docker Compose plugin for the containerized development environment
 
 ## Getting started
 
@@ -32,6 +33,36 @@ pnpm nx run-many -t dev serve -p landing app api
 ```
 
 Nx starts the two Next.js development servers (`landing:dev` and `app:dev`) and the API target (`api:serve`) in parallel. The development targets are marked as continuous, so they keep running until you stop the command with `Ctrl+C`. The API target invokes `gradle bootRun` from `apps/api`.
+
+## Containerized development
+
+The root `compose.yaml` starts the complete development stack: the Next.js app, the public landing page, the Spring Boot API, and PostgreSQL. The Node services mount the repository into the containers, so Next.js hot reload picks up source edits. The API container watches Java source files and restarts Gradle BootRun when they change. PostgreSQL data is kept in a named Docker volume.
+
+Start the stack from the repository root:
+
+```sh
+docker compose up --build
+```
+
+Open the services at:
+
+| Service | URL |
+| --- | --- |
+| Web app | http://localhost:3000 |
+| Landing page | http://localhost:3001 |
+| API health | http://localhost:8080/api/health |
+| PostgreSQL | `localhost:5432` (database/user: `markerit`, password: `markerit_dev`) |
+
+The API waits until PostgreSQL passes its health check before starting. The database credentials are development defaults only; override `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in a root `.env` file if needed. The API currently exposes a health endpoint and does not yet persist application data.
+
+Stop the services with `Ctrl+C`, or run `docker compose down`. The named PostgreSQL volume is retained by default; `docker compose down -v` also deletes that development database. If you change workspace dependencies, refresh the shared Node install volume and restart the apps:
+
+```sh
+docker compose run --rm install
+docker compose up
+```
+
+View a service's logs with `docker compose logs -f app` (replace `app` with `landing`, `api`, or `database`).
 
 ## Workspace layout
 

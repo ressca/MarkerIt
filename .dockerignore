@@ -1,0 +1,11 @@
+.git
+.nx
+node_modules
+**/node_modules
+**/.next
+**/build
+**/dist
+coverage
+.env
+.env.*
+!.env.example

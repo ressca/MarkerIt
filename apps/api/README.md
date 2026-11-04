@@ -1,22 +1,24 @@
 # MarkerIt API
 
-Minimalna aplikacja REST Spring Boot dla backendu MarkerIt.
+A minimal Spring Boot REST API for MarkerIt.
 
-## Wymagania
+## Requirements
 
-- JDK 21 lub nowszy
-- Gradle 8.14 lub nowszy (albo Gradle 9)
+- JDK 21 or newer
+- Gradle 8.14 or newer (or Gradle 9)
 
-## Uruchomienie
+## Run locally
 
-Z katalogu `apps/api`:
+From `apps/api`:
 
 ```sh
 gradle bootRun
 ```
 
-Kontrolny endpoint `GET /api/health` zwraca:
+The health endpoint `GET /api/health` returns:
 
 ```json
 {"status":"ok"}
 ```
+
+For the full development stack, including PostgreSQL, run `docker compose up --build` from the repository root. The Compose API service watches Java source changes and restarts the application.
