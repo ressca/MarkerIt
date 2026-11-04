@@ -15,7 +15,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     working_dir: /workspace
-    command: pnpm nx dev app --hostname 0.0.0.0 --port 3000
+    command: pnpm --filter @markerit/app exec next dev --hostname 0.0.0.0 --port 3000
     depends_on:
       install:
         condition: service_completed_successfully
@@ -33,7 +33,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     working_dir: /workspace
-    command: pnpm nx dev landing --hostname 0.0.0.0 --port 3001
+    command: pnpm --filter @markerit/landing exec next dev --hostname 0.0.0.0 --port 3001
     depends_on:
       install:
         condition: service_completed_successfully
