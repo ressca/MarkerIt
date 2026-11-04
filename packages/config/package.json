@@ -1,0 +1,13 @@
+{
+  "name": "@markerit/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./eslint": "./eslint/base.mjs",
+    "./typescript": "./typescript/base.json"
+  },
+  "dependencies": {
+    "@nx/eslint-plugin": "^24.0.0"
+  }
+}

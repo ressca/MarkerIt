@@ -1,0 +1,7 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "api-client",
+  "projectType": "library",
+  "sourceRoot": "packages/api-client/src",
+  "tags": ["type:contract", "scope:shared", "platform:web"]
+}

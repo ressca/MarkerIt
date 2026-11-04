@@ -1,0 +1,7 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "config",
+  "projectType": "library",
+  "sourceRoot": "packages/config",
+  "tags": ["type:util", "scope:shared", "platform:tooling"]
+}
