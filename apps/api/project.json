@@ -1,0 +1,18 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "api",
+  "projectType": "application",
+  "sourceRoot": "apps/api/src/main/java",
+  "tags": ["type:application", "scope:api", "platform:backend"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "gradle bootRun",
+        "cwd": "apps/api"
+      },
+      "cache": false,
+      "continuous": true
+    }
+  }
+}
