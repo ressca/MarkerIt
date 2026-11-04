@@ -40,7 +40,7 @@ Nx starts the two Next.js development servers (`landing:dev` and `app:dev`) and 
 | `apps/landing` | `landing` | Public Next.js landing page, port 3001 |
 | `apps/app` | `app` | MarkerIt web application, port 3000 |
 | `apps/api` | `api` | Spring Boot REST API |
-| `packages/ui` | `ui` | Shared React components |
+| `packages/ui` | `ui` | Shared React and shadcn/ui components, theme tokens, and CSS |
 | `packages/validators` | `validators` | Shared Zod schemas and input types |
 | `packages/api-client` | `api-client` | REST client and API error handling |
 | `packages/config` | `config` | Shared TypeScript and ESLint configuration |
@@ -109,5 +109,13 @@ import { apiRequest, createReviewPin } from '@markerit/api-client';
 ```
 
 The API client uses `http://localhost:8080/api/v1` by default. Set `NEXT_PUBLIC_API_URL` to override it. The landing page uses `http://localhost:3000` as the application URL by default; set `NEXT_PUBLIC_APP_URL` to override it. The application dashboard currently contains static example data.
+
+Both Next.js apps use Tailwind CSS v4 through their PostCSS configuration. The shared shadcn/ui theme and global CSS live in `packages/ui/src/styles/globals.css` and are imported by each app. The paired `components.json` files in `apps/app`, `apps/landing`, and `packages/ui` route generated shared components to `@markerit/ui`. To add a component from the repository root, for example:
+
+```sh
+pnpm dlx shadcn@latest add button -c apps/app
+```
+
+The shared UI package exports generated components by subpath, such as `@markerit/ui/components/button`, and exports the `cn` helper as `@markerit/ui/lib/utils`.
 
 Project tags and `@nx/enforce-module-boundaries` in the shared ESLint configuration define which projects may depend on one another. Applications are separated by scope (`scope:landing`, `scope:app`, and `scope:api`); shared libraries use `scope:shared` and type tags such as `type:ui`, `type:util`, and `type:contract`.
