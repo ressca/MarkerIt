@@ -1,5 +1,22 @@
 import { z } from 'zod';
 
+export const registerAccountSchema = z
+  .object({
+    email: z.string().trim().min(1, 'emailRequired').email('emailInvalid').max(320, 'emailTooLong'),
+    password: z
+      .string()
+      .min(12, 'passwordTooShort')
+      .max(72, 'passwordTooLong')
+      .refine((value) => new TextEncoder().encode(value).length <= 72, 'passwordTooLong'),
+    confirmPassword: z.string().min(1, 'passwordConfirmationRequired'),
+  })
+  .refine((values) => values.password === values.confirmPassword, {
+    path: ['confirmPassword'],
+    message: 'passwordsDoNotMatch',
+  });
+
+export type RegisterAccountInput = z.infer<typeof registerAccountSchema>;
+
 export const workspaceNameSchema = z.string().trim().min(1, 'Podaj nazwę workspace’u.');
 
 export const projectNameSchema = z

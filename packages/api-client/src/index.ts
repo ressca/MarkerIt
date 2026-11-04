@@ -37,6 +37,15 @@ export type ApiRequestOptions = Omit<RequestInit, 'credentials'> & {
   baseUrl?: string;
 };
 
+export type AuthenticatedUser = {
+  id: string;
+  email: string;
+};
+
+export type RegisterAccountResponse = AuthenticatedUser & {
+  createdAt: string;
+};
+
 const defaultBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/api/v1';
 
 function isApiProblem(value: unknown): value is ApiProblem {
@@ -118,6 +127,21 @@ export function createReviewPin<TResponse>(reviewId: string, input: PinCreateInp
 export function createPinComment<TResponse>(pinId: string, input: CommentCreateInput): Promise<TResponse> {
   return apiRequest<TResponse>(`pins/${encodeURIComponent(pinId)}/comments`, {
     method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+async function csrfHeaders(): Promise<HeadersInit> {
+  const { token } = await apiRequest<{ token: string }>('auth/csrf');
+  return { 'X-XSRF-TOKEN': token };
+}
+
+export async function registerAccount(
+  input: { email: string; password: string },
+): Promise<RegisterAccountResponse> {
+  return apiRequest<RegisterAccountResponse>('auth/register', {
+    method: 'POST',
+    headers: await csrfHeaders(),
     body: JSON.stringify(input),
   });
 }

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@markerit/api-client": "workspace:*",
+    "@markerit/i18n": "workspace:*",
     "@markerit/ui": "workspace:*",
     "@markerit/validators": "workspace:*",
     "next": "^16.0.0",
