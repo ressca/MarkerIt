@@ -55,6 +55,9 @@ services:
         condition: service_healthy
     environment:
       GRADLE_USER_HOME: /home/gradle/.gradle
+      SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:-markerit}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-markerit}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-markerit_dev}
     ports:
       - "8080:8080"
     volumes:

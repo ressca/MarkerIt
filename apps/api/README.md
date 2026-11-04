@@ -15,6 +15,8 @@ From `apps/api`:
 gradle bootRun
 ```
 
+The API connects to PostgreSQL using `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`. Flyway applies versioned SQL migrations from `src/main/resources/db/migration` at startup. The first migration creates the user table with normalized unique email addresses and password hash storage.
+
 The health endpoint `GET /api/health` returns:
 
 ```json
