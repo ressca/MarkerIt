@@ -70,6 +70,12 @@ public class AuthController {
                 .body(new LoginResponse(session.user().getId(), session.user().getEmail(), session.expiresAt()));
     }
 
+    @GetMapping("/session")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void validateSession(@AuthenticationPrincipal Jwt jwt) {
+        // The resource server validates the token signature and active database session.
+    }
+
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@AuthenticationPrincipal Jwt jwt) {
         sessions.revoke(UUID.fromString(jwt.getId()));
