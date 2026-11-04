@@ -16,26 +16,32 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ProblemDetail> invalidRequest(MethodArgumentNotValidException exception) {
-        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Dane formularza są nieprawidłowe.");
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "The submitted data is invalid.");
         List<Map<String, String>> errors = exception.getBindingResult().getFieldErrors().stream()
                 .map(error -> Map.of(
                         "field", error.getField(),
-                        "code", error.getDefaultMessage() == null ? "invalid" : error.getDefaultMessage(),
-                        "message", "Sprawdź to pole."))
+                        "code", error.getCode() == null ? "invalid" : error.getCode(),
+                        "message", error.getDefaultMessage() == null ? "Check this field." : error.getDefaultMessage()))
                 .toList();
         problem.setProperty("fieldErrors", errors);
         return ResponseEntity.badRequest().body(problem);
     }
 
+    @ExceptionHandler(InvalidCredentialsException.class)
+    ResponseEntity<ProblemDetail> invalidCredentials() {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(problem(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "The email or password is incorrect."));
+    }
+
     @ExceptionHandler(EmailAlreadyRegisteredException.class)
     ResponseEntity<ProblemDetail> duplicateEmail() {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(problem(HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED", "Konto z tym adresem e-mail już istnieje."));
+                .body(problem(HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED", "An account with this email already exists."));
     }
 
     @ExceptionHandler(PasswordPolicyException.class)
     ResponseEntity<ProblemDetail> passwordPolicy(PasswordPolicyException exception) {
-        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Hasło jest nieprawidłowe.");
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "The password is invalid.");
         problem.setProperty("fieldErrors", List.of(Map.of(
                 "field", "password", "code", "password_length", "message", exception.getMessage())));
         return ResponseEntity.badRequest().body(problem);
@@ -44,7 +50,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<ProblemDetail> constraintViolation() {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(problem(HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED", "Konto z tym adresem e-mail już istnieje."));
+                .body(problem(HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED", "An account with this email already exists."));
     }
 
     private ProblemDetail problem(HttpStatus status, String code, String detail) {

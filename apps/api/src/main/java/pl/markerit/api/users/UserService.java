@@ -25,14 +25,15 @@ public class UserService {
             throw new EmailAlreadyRegisteredException();
         }
         if (rawPassword.getBytes(StandardCharsets.UTF_8).length > 72) {
-            throw new PasswordPolicyException("Hasło może mieć maksymalnie 72 bajty UTF-8.");
+            throw new PasswordPolicyException("The password cannot exceed 72 UTF-8 bytes.");
         }
         String passwordHash = passwordEncoder.encode(rawPassword);
         return users.save(new User(normalizedEmail, passwordHash));
     }
 
     @Transactional(readOnly = true)
-    public java.util.Optional<User> findByEmail(String email) {
-        return users.findByEmail(email.trim().toLowerCase(java.util.Locale.ROOT));
+    public java.util.Optional<User> authenticate(String email, String rawPassword) {
+        return users.findByEmail(email.trim().toLowerCase(java.util.Locale.ROOT))
+                .filter(user -> passwordEncoder.matches(rawPassword, user.getPasswordHash()));
     }
 }
