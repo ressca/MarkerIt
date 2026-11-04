@@ -81,6 +81,9 @@ importers:
       '@markerit/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@markerit/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@markerit/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -131,6 +134,12 @@ importers:
       '@nx/eslint-plugin':
         specifier: ^24.0.0
         version: 24.0.4(@babel/traverse@7.29.12)(@typescript-eslint/parser@8.72.1(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3))(eslint@9.39.5(jiti@2.7.0))(nx@24.0.4)(typescript@6.0.3)
+
+  packages/i18n:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
 
   packages/ui:
     dependencies:

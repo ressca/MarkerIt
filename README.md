@@ -74,6 +74,7 @@ View a service's logs with `docker compose logs -f app` (replace `app` with `lan
 | `packages/ui` | `ui` | Shared React and shadcn/ui components, theme tokens, and CSS |
 | `packages/validators` | `validators` | Shared Zod schemas and input types |
 | `packages/api-client` | `api-client` | REST client and API error handling |
+| `packages/i18n` | `i18n` | Shared English and Polish UI translations |
 | `packages/config` | `config` | Shared TypeScript and ESLint configuration |
 
 ## Working with Nx
@@ -148,5 +149,11 @@ pnpm dlx shadcn@latest add button -c apps/app
 ```
 
 The shared UI package exports generated components by subpath, such as `@markerit/ui/components/button`, and exports the `cn` helper as `@markerit/ui/lib/utils`.
+
+## Product UI conventions
+
+- Build layouts mobile-first: start with the narrow-screen layout, then add wider-screen breakpoints.
+- Add user-facing text in both Polish and English to `@markerit/i18n`; avoid hard-coded interface copy in app components.
+- The landing page defaults to Polish and lets visitors switch to English. Their choice is remembered in the browser.
 
 Project tags and `@nx/enforce-module-boundaries` in the shared ESLint configuration define which projects may depend on one another. Applications are separated by scope (`scope:landing`, `scope:app`, and `scope:api`); shared libraries use `scope:shared` and type tags such as `type:ui`, `type:util`, and `type:contract`.
