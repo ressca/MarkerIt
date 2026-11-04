@@ -1,0 +1,49 @@
+html.dark {
+  color-scheme: dark;
+  --ink: #eef2ed;
+  --muted: #a8b2aa;
+  --paper: #090b0a;
+  --line: #303832;
+}
+
+html.dark body { background: #090b0a; color: var(--ink); }
+html.dark .topbar { border-bottom-color: #252c27; }
+html.dark .topbar nav,
+html.dark .hero-description,
+html.dark .section-heading > p:last-child { color: #a8b2aa; }
+html.dark .language-switch { border-color: #39443c; background: #151a16; }
+html.dark .language-switch button { color: #bdc6be; }
+html.dark .language-switch button[aria-pressed='true'] { background: #2a392b; color: #d4efbd; }
+html.dark .theme-toggle { color: #e2e9e3; }
+html.dark .button { background: #b9f279; color: #11180f; }
+html.dark .button:hover { background: #c8fa91; }
+html.dark .eyebrow,
+html.dark .hero-note,
+html.dark .footer { color: #a2aca4; }
+html.dark .hero h1,
+html.dark .section-heading h2 { color: #f0f4ef; }
+html.dark .hero h1 span,
+html.dark .section-heading h2 span { color: #b9d79e; }
+html.dark .review-card { border-color: #303a32; background: #141915; box-shadow: 0 20px 48px rgba(0, 0, 0, .35); }
+html.dark .file-icon { background: #273329; color: #c1dfaa; }
+html.dark .file-label small,
+html.dark .comment-meta span,
+html.dark .card-footer { color: #a2aca4; }
+html.dark .review-status { background: #263328; color: #c6e6a8; }
+html.dark .artboard { background: linear-gradient(145deg, #29352b 0%, #252d25 43%, #1b241d 100%); }
+html.dark .artboard::before { opacity: .25; }
+html.dark .art-copy { color: #eef4e9; }
+html.dark .art-sun { background: radial-gradient(circle at 35% 34%, #e4e9c5, #82916b 74%); }
+html.dark .art-caption { color: #c5d0bd; }
+html.dark .comment-preview p { color: #d2d9d3; }
+html.dark .avatar { background: #3a3027; color: #f0d7b7; }
+html.dark .comment-pin { background: #29372a; color: #d1ebb8; }
+html.dark .card-footer { border-top-color: #2b332d; }
+html.dark .steps-section { background: #101411; }
+html.dark .section-heading .eyebrow { color: #a8b8a1; }
+html.dark .step-card { border-color: #303832; background: #171d18; }
+html.dark .step-number { color: #b9d79e; }
+html.dark .step-card p { color: #a8b2aa; }
+html.dark .footer .wordmark { color: #eef2ed; }
+
+.theme-toggle { width: 34px; height: 34px; flex: 0 0 auto; }

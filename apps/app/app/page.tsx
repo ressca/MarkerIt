@@ -1,3 +1,5 @@
+import { ThemeToggle } from '@markerit/ui';
+
 const projects = [
   { name: 'Kampania — wiosna', workspace: 'Studio Północ', status: 'W toku', count: 4, tone: 'sage', updated: 'Dziś, 10:42' },
   { name: 'Opakowanie produktu', workspace: 'Studio Północ', status: 'W toku', count: 2, tone: 'sand', updated: 'Wczoraj' },
@@ -19,7 +21,7 @@ export default function DashboardPage() {
       </aside>
 
       <section className="main-panel" id="projekty">
-        <header className="page-top"><div className="breadcrumbs">Workspace <span>/</span> Projekty</div><button className="help-button" aria-label="Pomoc">?</button></header>
+        <header className="page-top"><div className="breadcrumbs">Workspace <span>/</span> Projekty</div><div className="top-actions"><ThemeToggle className="dashboard-theme-toggle" switchToDarkLabel="Włącz czarny motyw" switchToLightLabel="Włącz jasny motyw"/><button className="help-button" aria-label="Pomoc">?</button></div></header>
         <div className="page-content">
           <div className="heading-row"><div><p className="eyebrow">STUDIO PÓŁNOC · WORKSPACE</p><h1>Twoje projekty</h1><p className="subheading">Miejsce, w którym zbierają się dobre pomysły i konkretny feedback.</p></div><button className="primary-button"><span>＋</span> Nowy projekt</button></div>
 

@@ -1,0 +1,45 @@
+html.dark {
+  color-scheme: dark;
+  --ink: #edf2ee;
+  --muted: #a1aba4;
+  --line: #303832;
+  --canvas: #090b0a;
+}
+
+html.dark body,
+html.dark .main-panel { background: #090b0a; color: var(--ink); }
+html.dark .sidebar,
+html.dark .page-top,
+html.dark .summary-card,
+html.dark .filter-button,
+html.dark .help-button,
+html.dark .project-list { border-color: var(--line); background: #121613; color: var(--ink); }
+html.dark .sidebar { border-right-color: var(--line); }
+html.dark .page-top { border-bottom-color: var(--line); }
+html.dark .workspace-switcher { border-color: #354139; }
+html.dark .workspace-switcher small,
+html.dark .profile small,
+html.dark .nav-label,
+html.dark .breadcrumbs,
+html.dark .summary-card small,
+html.dark .section-toolbar p,
+html.dark .project-info small,
+html.dark .comment-count,
+html.dark .updated,
+html.dark .shared-empty p,
+html.dark .dashboard-footer { color: #a1aba4; }
+html.dark .side-nav a,
+html.dark .sidebar-bottom > a { color: #b6c0b8; }
+html.dark .side-nav a.active { background: #263329; color: #c2e5a3; }
+html.dark .project-row { border-bottom-color: #272e29; }
+html.dark .shared-empty { border-color: #354139; }
+html.dark .shared-icon { background: #202a22; color: #c1d9b0; }
+html.dark .shared-empty > a,
+html.dark .status.in-progress { color: #bfdb9e; }
+html.dark .status.closed,
+html.dark .more-button { color: #a1aba4; }
+html.dark .primary-button { background: #b9f279; color: #10170f; }
+html.dark .workspace-mark { background: #29372a; color: #c2e5a3; }
+.top-actions { display: flex; align-items: center; gap: 8px; }
+.dashboard-theme-toggle { width: 30px; height: 30px; color: #737e76; }
+html.dark .dashboard-theme-toggle { color: #d2dfd4; }

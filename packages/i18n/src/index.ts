@@ -11,6 +11,10 @@ export const messages = {
     howItWorksLink: 'How it works',
     benefitsLink: 'Benefits',
     openApp: 'Open the app',
+    theme: {
+      switchToDark: 'Switch to dark theme',
+      switchToLight: 'Switch to light theme',
+    },
     hero: {
       eyebrow: 'Project reviews without the guesswork',
       titleFirst: 'Every comment',
@@ -71,6 +75,10 @@ export const messages = {
     howItWorksLink: 'Jak to działa',
     benefitsLink: 'Korzyści',
     openApp: 'Otwórz aplikację',
+    theme: {
+      switchToDark: 'Włącz czarny motyw',
+      switchToLight: 'Włącz jasny motyw',
+    },
     hero: {
       eyebrow: 'Review projektów bez zgadywania',
       titleFirst: 'Każda uwaga',

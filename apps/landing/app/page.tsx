@@ -1,6 +1,7 @@
 'use client';
 
 import { getMessages, isLocale, type Locale } from '@markerit/i18n';
+import { ThemeToggle } from '@markerit/ui';
 import { useEffect, useState } from 'react';
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
@@ -49,6 +50,11 @@ export default function HomePage() {
           <a href="#benefits">{copy.benefitsLink}</a>
         </nav>
         <div className="header-actions">
+          <ThemeToggle
+            className="theme-toggle"
+            switchToDarkLabel={copy.theme.switchToDark}
+            switchToLightLabel={copy.theme.switchToLight}
+          />
           <div className="language-switch" role="group" aria-label={copy.languageLabel}>
             <button
               type="button"
