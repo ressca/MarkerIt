@@ -59,7 +59,7 @@ export default function HomePage() {
                 </Button>
               ))}
             </div>
-            <Button size="sm" className="gap-1.5 px-2.5 sm:px-3" render={<a href={appUrl} aria-label={copy.openApp} />}>
+            <Button nativeButton={false} size="sm" className="gap-1.5 px-2.5 sm:px-3" render={<a href={appUrl} aria-label={copy.openApp} />}>
               <span className="hidden min-[390px]:inline">{copy.openApp}</span><span aria-hidden="true">↗</span>
             </Button>
           </div>
@@ -76,7 +76,7 @@ export default function HomePage() {
           </h1>
           <p className="mt-5 max-w-md text-sm leading-7 text-muted-foreground sm:text-base">{copy.hero.description}</p>
           <div className="mt-6 flex flex-wrap items-center gap-5">
-            <Button size="lg" className="gap-3 px-5" render={<a href={appUrl} />}>{copy.hero.primaryAction}<span aria-hidden="true">→</span></Button>
+            <Button nativeButton={false} size="lg" className="gap-3 px-5" render={<a href={appUrl} />}>{copy.hero.primaryAction}<span aria-hidden="true">→</span></Button>
             <a className="inline-flex items-center gap-2 text-sm font-semibold hover:text-primary" href="#how-it-works">
               {copy.hero.secondaryAction}<span aria-hidden="true" className="text-base text-primary">↓</span>
             </a>
