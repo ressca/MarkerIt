@@ -1,3 +1,4 @@
+import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -16,11 +17,20 @@ describe('landing page', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Przypnij uwagę');
     expect(screen.getByRole('navigation', { name: 'Nawigacja główna' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: /Przypnij uwagę do obrazu/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Przykład komentarza' })).toHaveAttribute('href', '#example');
+    expect(screen.getByRole('link', { name: 'Przykład' })).toHaveAttribute('href', '#example');
     expect(screen.getByText('Opakowanie produktu')).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(3);
     await waitFor(() => expect(document.title).toContain('wizualny feedback'));
     expect(document.documentElement.lang).toBe('pl');
+  });
+
+  it('keeps the header clear at the top and adds its border after scrolling', () => {
+    render(<HomePage />);
+    const header = document.querySelector('header');
+    expect(header).toHaveClass('border-transparent');
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 40 });
+    fireEvent.scroll(window);
+    expect(header).toHaveClass('border-border/70');
   });
 
   it('changes language, page metadata and app links', async () => {

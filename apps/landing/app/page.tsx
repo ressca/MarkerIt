@@ -13,6 +13,7 @@ const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 export default function HomePage() {
   const [locale, setLocale] = useState<Locale>('pl');
   const [hydrated, setHydrated] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const copy = getMessages(locale);
 
   useEffect(() => {
@@ -39,11 +40,18 @@ export default function HomePage() {
     }
   }, [copy.metadata.description, copy.metadata.title, hydrated, locale]);
 
+  useEffect(() => {
+    const updateScrollState = () => setIsScrolled(window.scrollY > 8);
+    updateScrollState();
+    window.addEventListener('scroll', updateScrollState, { passive: true });
+    return () => window.removeEventListener('scroll', updateScrollState);
+  }, []);
+
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <header id="home" className="border-b border-border/60">
+      <header className={`sticky top-0 z-50 border-b transition-[background-color,border-color,box-shadow] duration-300 motion-reduce:transition-none ${isScrolled ? 'border-border/70 bg-background/95 shadow-sm backdrop-blur' : 'border-transparent bg-background'}`}>
         <div className="mx-auto flex min-h-[68px] max-w-6xl flex-wrap items-center justify-between gap-x-8 gap-y-2 px-4 py-3 sm:px-8 lg:min-h-[76px] lg:px-10">
-          <a href="#home" aria-label={copy.homeLabel} className="flex w-fit items-center text-[1.35rem] font-extrabold tracking-[-0.09em]">
+          <a href="#home" aria-label={copy.homeLabel} className="flex w-fit items-center text-2xl font-extrabold tracking-[-0.09em]">
             <svg aria-hidden="true" viewBox="0 0 24 24" className="mr-2 size-[22px] text-primary" fill="none">
               <path d="M19.5 11.25a7.25 7.25 0 0 1-7.25 7.25c-1.2 0-2.3-.3-3.3-.8L4.5 19l1.1-4.1a7.25 7.25 0 1 1 13.9-3.65Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
               <circle cx="12.25" cy="11.25" r="1.6" fill="currentColor" />
