@@ -36,6 +36,13 @@ public class ApiExceptionHandler {
                 .body(problem(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "The email or password is incorrect."));
     }
 
+    @ExceptionHandler(LoginRateLimitException.class)
+    ResponseEntity<ProblemDetail> loginRateLimited(LoginRateLimitException exception) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", Long.toString(exception.getRetryAfterSeconds()))
+                .body(problem(HttpStatus.TOO_MANY_REQUESTS, "LOGIN_RATE_LIMITED", "Too many login attempts. Try again later."));
+    }
+
     @ExceptionHandler(EmailAlreadyRegisteredException.class)
     ResponseEntity<ProblemDetail> duplicateEmail() {
         return ResponseEntity.status(HttpStatus.CONFLICT)

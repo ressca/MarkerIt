@@ -19,6 +19,7 @@ class UserServiceTest {
     @BeforeEach void setUp() {
         users = mock(UserRepository.class);
         passwords = mock(PasswordEncoder.class);
+        when(passwords.encode(anyString())).thenReturn("dummy-hash");
         service = new UserService(users, passwords);
     }
 
@@ -38,7 +39,7 @@ class UserServiceTest {
         when(users.existsByEmail("person@example.com")).thenReturn(true);
         assertThrows(EmailAlreadyRegisteredException.class,
                 () -> service.createUser("Person@example.com", "a-long-password"));
-        verifyNoInteractions(passwords);
+        verify(passwords, never()).matches(anyString(), anyString());
         verify(users, never()).save(any());
     }
 
@@ -59,6 +60,7 @@ class UserServiceTest {
     @Test void returnsEmptyForUnknownUserOrIncorrectPassword() {
         when(users.findByEmail("missing@example.com")).thenReturn(Optional.empty());
         assertTrue(service.authenticate("missing@example.com", "password").isEmpty());
+        verify(passwords).matches(eq("password"), argThat(hash -> !"encoded".equals(hash)));
         User user = mock(User.class);
         when(users.findByEmail("person@example.com")).thenReturn(Optional.of(user));
         when(user.getPasswordHash()).thenReturn("encoded");

@@ -1,6 +1,7 @@
 package pl.markerit.api.auth.web;
 
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -29,16 +30,19 @@ public class AuthController {
 
     private final UserService users;
     private final AuthSessionService sessions;
+    private final LoginRateLimiter loginRateLimiter;
     private final boolean secureCookie;
     private final Duration tokenLifetime;
 
     public AuthController(
             UserService users,
             AuthSessionService sessions,
+            LoginRateLimiter loginRateLimiter,
             @Value("${app.security.auth-cookie-secure:false}") boolean secureCookie,
             @Value("${app.security.jwt-lifetime:PT12H}") Duration tokenLifetime) {
         this.users = users;
         this.sessions = sessions;
+        this.loginRateLimiter = loginRateLimiter;
         this.secureCookie = secureCookie;
         this.tokenLifetime = tokenLifetime;
     }
@@ -56,7 +60,11 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        if (!loginRateLimiter.allow(httpRequest.getRemoteAddr(), request.email(), Instant.now())) {
+            throw new LoginRateLimitException(loginRateLimiter.retryAfterSeconds(
+                    httpRequest.getRemoteAddr(), request.email(), Instant.now()));
+        }
         AuthSessionService.LoginSession session = sessions.login(request.email(), request.password());
         ResponseCookie cookie = ResponseCookie.from(SecurityConfiguration.SESSION_COOKIE, session.token())
                 .httpOnly(true)

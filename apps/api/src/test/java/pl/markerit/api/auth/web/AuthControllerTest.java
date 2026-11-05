@@ -20,12 +20,15 @@ import pl.markerit.api.users.UserService;
 class AuthControllerTest {
     private UserService users;
     private AuthSessionService sessions;
+    private LoginRateLimiter loginRateLimiter;
     private AuthController controller;
 
     @BeforeEach void setUp() {
         users = mock(UserService.class);
         sessions = mock(AuthSessionService.class);
-        controller = new AuthController(users, sessions, false, Duration.ofHours(12));
+        loginRateLimiter = mock(LoginRateLimiter.class);
+        when(loginRateLimiter.allow(anyString(), anyString(), any())).thenReturn(true);
+        controller = new AuthController(users, sessions, loginRateLimiter, false, Duration.ofHours(12));
     }
 
     @Test void returnsCsrfToken() {
@@ -54,7 +57,8 @@ class AuthControllerTest {
         Instant expires = Instant.now().plusSeconds(3600);
         when(sessions.login("person@example.com", "password-1234"))
                 .thenReturn(new LoginSession("jwt-value", expires, user));
-        var response = controller.login(new LoginRequest("person@example.com", "password-1234"));
+        var response = controller.login(new LoginRequest("person@example.com", "password-1234"),
+                new org.springframework.mock.web.MockHttpServletRequest());
         assertEquals("person@example.com", response.getBody().email());
         String cookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
         assertNotNull(cookie);

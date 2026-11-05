@@ -1,6 +1,7 @@
 package pl.markerit.api.users;
 
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,10 +13,12 @@ public class UserService {
 
     private final UserRepository users;
     private final PasswordEncoder passwordEncoder;
+    private final String unknownUserPasswordHash;
 
     public UserService(UserRepository users, PasswordEncoder passwordEncoder) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
+        this.unknownUserPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
     @Transactional
@@ -33,7 +36,9 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public java.util.Optional<User> authenticate(String email, String rawPassword) {
-        return users.findByEmail(email.trim().toLowerCase(java.util.Locale.ROOT))
-                .filter(user -> passwordEncoder.matches(rawPassword, user.getPasswordHash()));
+        java.util.Optional<User> user = users.findByEmail(email.trim().toLowerCase(java.util.Locale.ROOT));
+        String passwordHash = user.map(User::getPasswordHash).orElse(unknownUserPasswordHash);
+        boolean passwordMatches = passwordEncoder.matches(rawPassword, passwordHash);
+        return user.filter(ignored -> passwordMatches);
     }
 }
