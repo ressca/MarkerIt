@@ -3,3 +3,4 @@ export type { ButtonProps, ButtonVariant } from './button';
 export { StatusBadge } from './status-badge';
 export type { StatusBadgeProps } from './status-badge';
 export { ThemeToggle } from './components/theme-toggle';
+export { Popover, PopoverContent, PopoverTrigger } from './components/popover';

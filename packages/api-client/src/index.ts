@@ -15,6 +15,7 @@ export type ApiProblem = {
   instance?: string;
   requestId?: string;
   fieldErrors?: ApiFieldError[];
+  retryAfterSeconds?: number;
 };
 
 export class ApiError extends Error {
@@ -22,6 +23,7 @@ export class ApiError extends Error {
   readonly code: string;
   readonly fieldErrors: ApiFieldError[];
   readonly requestId?: string;
+  readonly retryAfterSeconds?: number;
 
   constructor(status: number, code: string, message: string, problem?: ApiProblem, cause?: unknown) {
     super(message, { cause });
@@ -30,6 +32,7 @@ export class ApiError extends Error {
     this.code = code;
     this.fieldErrors = Array.isArray(problem?.fieldErrors) ? problem.fieldErrors : [];
     this.requestId = problem?.requestId;
+    this.retryAfterSeconds = problem?.retryAfterSeconds;
   }
 }
 
@@ -48,6 +51,12 @@ export type RegisterAccountResponse = AuthenticatedUser & {
 
 export type LoginAccountResponse = AuthenticatedUser & {
   expiresAt: string;
+};
+
+export type VerificationChallengeResponse = {
+  email: string;
+  expiresAt: string;
+  resendAvailableAt: string;
 };
 
 const defaultBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/api/v1';
@@ -142,11 +151,27 @@ async function csrfHeaders(): Promise<HeadersInit> {
 
 export async function registerAccount(
   input: { email: string; password: string },
-): Promise<RegisterAccountResponse> {
-  return apiRequest<RegisterAccountResponse>('auth/register', {
+): Promise<VerificationChallengeResponse> {
+  return apiRequest<VerificationChallengeResponse>('auth/register', {
     method: 'POST',
     headers: await csrfHeaders(),
     body: JSON.stringify(input),
+  });
+}
+
+export async function resendVerification(email: string): Promise<VerificationChallengeResponse> {
+  return apiRequest<VerificationChallengeResponse>('auth/verification/resend', {
+    method: 'POST',
+    headers: await csrfHeaders(),
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function verifyEmail(email: string, code: string): Promise<LoginAccountResponse> {
+  return apiRequest<LoginAccountResponse>('auth/verification/verify', {
+    method: 'POST',
+    headers: await csrfHeaders(),
+    body: JSON.stringify({ email, code }),
   });
 }
 

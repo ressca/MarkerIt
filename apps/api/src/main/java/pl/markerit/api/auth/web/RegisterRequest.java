@@ -10,6 +10,6 @@ public record RegisterRequest(
         @Size(max = 320, message = "This value is too long.")
         String email,
         @NotBlank(message = "This field is required.")
-        @Size(min = 12, max = 72, message = "Use a password between 12 and 72 characters.")
+        @Size(min = 8, max = 72, message = "Use a password between 8 and 72 characters.")
         String password) {
 }

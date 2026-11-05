@@ -5,7 +5,7 @@ export const registerAccountSchema = z
     email: z.string().trim().min(1, 'emailRequired').email('emailInvalid').max(320, 'emailTooLong'),
     password: z
       .string()
-      .min(12, 'passwordTooShort')
+      .min(8, 'passwordTooShort')
       .max(72, 'passwordTooLong')
       .refine((value) => new TextEncoder().encode(value).length <= 72, 'passwordTooLong'),
     confirmPassword: z.string().min(1, 'passwordConfirmationRequired'),

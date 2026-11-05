@@ -8,19 +8,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mark
 import { Input } from '@markerit/ui/components/input';
 import { Label } from '@markerit/ui/components/label';
 import Link from 'next/link';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuthCopy } from '../components/auth-shell';
+import { EmailVerificationCard, pendingVerificationStorageKey } from '../components/email-verification-card';
 
 type FormField = keyof RegisterAccountInput;
 type FieldErrors = Partial<Record<FormField, string>>;
 
 export function RegisterForm() {
   const copy = useAuthCopy();
+  const router = useRouter();
   const [values, setValues] = useState<RegisterAccountInput>({ email: '', password: '', confirmPassword: '' });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState('');
-  const [complete, setComplete] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [resendAvailableAt, setResendAvailableAt] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const pendingEmail = window.sessionStorage.getItem(pendingVerificationStorageKey);
+    if (pendingEmail) setVerificationEmail(pendingEmail);
+  }, []);
+
 
   function updateField(field: FormField, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -44,11 +54,18 @@ export function RegisterForm() {
     setSubmitting(true);
     setFormError('');
     try {
-      await registerAccount({ email: result.data.email, password: result.data.password });
-      setComplete(true);
+      const challenge = await registerAccount({ email: result.data.email, password: result.data.password });
+      window.sessionStorage.setItem(pendingVerificationStorageKey, challenge.email);
+      setVerificationEmail(challenge.email);
+      setResendAvailableAt(challenge.resendAvailableAt);
     } catch (error) {
       if (error instanceof ApiError && error.code === 'EMAIL_ALREADY_REGISTERED') {
         setFieldErrors((current) => ({ ...current, email: 'emailExists' }));
+      } else if (error instanceof ApiError && ['OTP_RESEND_WAIT', 'OTP_RESEND_LIMIT'].includes(error.code)) {
+        window.sessionStorage.setItem(pendingVerificationStorageKey, result.data.email);
+        setVerificationEmail(result.data.email);
+        if (error.retryAfterSeconds) setResendAvailableAt(new Date(Date.now() + error.retryAfterSeconds * 1000).toISOString());
+        setFormError(error.code === 'OTP_RESEND_LIMIT' ? 'otpResendLimit' : 'otpResendWait');
       } else if (error instanceof ApiError && error.code === 'NETWORK_ERROR') {
         setFormError('networkError');
       } else if (error instanceof ApiError && error.code === 'HTTP_ERROR') {
@@ -66,17 +83,18 @@ export function RegisterForm() {
     return copy[code as keyof typeof copy] ?? copy.requestError;
   }
 
-  if (complete) {
+  if (verificationEmail) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">{copy.registerTitle}</CardTitle>
-          <CardDescription role="status">{copy.registerSuccess}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button nativeButton={false} className="w-full" render={<Link href="/login" />}>{copy.signInLink}</Button>
-        </CardContent>
-      </Card>
+      <EmailVerificationCard
+        email={verificationEmail}
+        resendAvailableAt={resendAvailableAt}
+        onChangeEmail={() => {
+          window.sessionStorage.removeItem(pendingVerificationStorageKey);
+          setVerificationEmail('');
+          setResendAvailableAt(undefined);
+        }}
+        onVerified={() => { router.replace('/'); router.refresh(); }}
+      />
     );
   }
 
