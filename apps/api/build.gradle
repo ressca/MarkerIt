@@ -50,7 +50,7 @@ jacocoTestReport {
 
 tasks.register('jacocoCoverageVerification', JacocoCoverageVerification) {
     dependsOn test
-    executionData.from(tasks.test.get().extensions.getByType(JacocoTaskExtension).destinationFile)
+    executionData.from(tasks.named('test', Test).get().extensions.getByType(JacocoTaskExtension).destinationFile)
     classDirectories.from(sourceSets.main.output)
     sourceDirectories.from(sourceSets.main.allSource.srcDirs)
     violationRules {
