@@ -53,7 +53,7 @@ Open the services at:
 | API health | http://localhost:8080/api/health |
 | PostgreSQL | `localhost:5432` (database/user: `markerit`, password: `markerit_dev`) |
 
-The API waits until PostgreSQL passes its health check before starting. The database credentials are development defaults only; override `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in a root `.env` file if needed. The API currently exposes a health endpoint and does not yet persist application data.
+The API waits until PostgreSQL passes its health check before starting. The database credentials are development defaults only; override `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in a root `.env` file if needed. The API currently provides health and authentication endpoints and stores users and revocable sessions in PostgreSQL.
 
 Stop the services with `Ctrl+C`, or run `docker compose down`. The named PostgreSQL volume is retained by default; `docker compose down -v` also deletes that development database. If you change workspace dependencies, refresh the shared Node install volume and restart the apps:
 
@@ -104,6 +104,9 @@ pnpm nx run-many -t lint
 pnpm nx run-many -t typecheck
 pnpm nx run-many -t test
 
+# Run the unit tests with coverage thresholds
+pnpm nx run-many -t test:coverage
+
 # Run multiple targets, or limit them to selected projects
 pnpm nx run-many -t lint test -p app api
 
@@ -115,6 +118,19 @@ pnpm nx run-many -t build --graph
 ```
 
 `run-many` only runs targets that exist on the selected projects. For instance, the TypeScript libraries currently expose `typecheck`, while the Next.js apps expose `build` and `lint`; the Gradle plugin supplies API build and test targets. You can inspect a project's available targets with `pnpm nx show project <project-name> --json`.
+
+## Tests and coverage
+
+Frontend unit tests use Vitest, Testing Library, and jsdom. Backend unit tests use JUnit 5 and Mockito. Run them from the repository root:
+
+```sh
+pnpm nx run app:test
+pnpm nx run api:test
+pnpm nx run app:test:coverage
+pnpm nx run api:test:coverage
+```
+
+The frontend coverage command enforces at least 80% statements, branches, functions, and lines. The backend JaCoCo verification is configured for at least 80% instruction coverage. In the current work, all 55 frontend tests and 23 backend tests pass; frontend coverage is 98.35%, and the JaCoCo report shows 80% instruction coverage. **Follow-up needed:** `jacocoCoverageVerification` currently fails while reading Gradle's test-results directory instead of the JaCoCo execution-data file, so its threshold check still needs repair and a successful rerun. Reports are generated under `coverage/` for the frontend and `apps/api/build/reports/jacoco/test/html/` for the API.
 
 For CI, `affected` limits work to changes since a base revision and their dependents:
 
