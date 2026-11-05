@@ -13,10 +13,11 @@ afterEach(() => {
 describe('landing page', () => {
   it('renders the Polish hero, navigation, preview and workflow', async () => {
     render(<HomePage />);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Każda uwaga');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Przypnij uwagę');
     expect(screen.getByRole('navigation', { name: 'Nawigacja główna' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: /Każda uwaga we właściwym miejscu/ })).toBeInTheDocument();
-    expect(screen.getByText('Kampania — wiosna')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /Przypnij uwagę do obrazu/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Przykład komentarza' })).toHaveAttribute('href', '#example');
+    expect(screen.getByText('Opakowanie produktu')).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(3);
     await waitFor(() => expect(document.title).toContain('wizualny feedback'));
     expect(document.documentElement.lang).toBe('pl');
@@ -26,7 +27,7 @@ describe('landing page', () => {
     const user = userEvent.setup();
     render(<HomePage />);
     await user.click(screen.getByRole('button', { name: 'EN' }));
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Every comment');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Pin a note');
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open the app' })).toHaveAttribute('href', 'http://localhost:3000');
     await waitFor(() => expect(document.documentElement.lang).toBe('en'));
@@ -36,11 +37,11 @@ describe('landing page', () => {
   it('restores a supported saved locale and ignores unsupported locale values', async () => {
     window.localStorage.setItem('markerit-locale', 'en');
     const { unmount } = render(<HomePage />);
-    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Every comment');
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Pin a note');
     unmount();
     window.localStorage.setItem('markerit-locale', 'de');
     render(<HomePage />);
-    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Każda uwaga');
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Przypnij uwagę');
   });
 
   it('keeps the page usable if browser storage is blocked', async () => {
@@ -49,6 +50,6 @@ describe('landing page', () => {
     const user = userEvent.setup();
     render(<HomePage />);
     await user.click(screen.getByRole('button', { name: 'EN' }));
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Every comment');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Pin a note');
   });
 });
