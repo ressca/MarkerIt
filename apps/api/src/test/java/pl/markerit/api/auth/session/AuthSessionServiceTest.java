@@ -10,6 +10,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import pl.markerit.api.auth.InvalidCredentialsException;
+import pl.markerit.api.auth.EmailNotVerifiedException;
 import pl.markerit.api.users.User;
 import pl.markerit.api.users.UserService;
 
@@ -28,6 +29,7 @@ class AuthSessionServiceTest {
 
     @Test void loginCreatesPersistedSessionAndJwt() {
         User user = mock(User.class);
+        when(user.isEmailVerified()).thenReturn(true);
         when(users.authenticate("user@example.com", "password")).thenReturn(Optional.of(user));
         when(sessions.save(any(UserSession.class))).thenAnswer(call -> call.getArgument(0));
         when(tokens.create(eq(user), any(UserSession.class), any(Instant.class))).thenReturn("signed-token");
@@ -46,6 +48,14 @@ class AuthSessionServiceTest {
     @Test void loginRejectsInvalidCredentials() {
         when(users.authenticate("user@example.com", "wrong")).thenReturn(Optional.empty());
         assertThrows(InvalidCredentialsException.class, () -> service.login("user@example.com", "wrong"));
+        verifyNoInteractions(sessions, tokens);
+    }
+
+    @Test void rejectsCorrectPasswordUntilEmailIsVerified() {
+        User user = mock(User.class);
+        when(users.authenticate("user@example.com", "password")).thenReturn(Optional.of(user));
+        when(user.isEmailVerified()).thenReturn(false);
+        assertThrows(EmailNotVerifiedException.class, () -> service.login("user@example.com", "password"));
         verifyNoInteractions(sessions, tokens);
     }
 

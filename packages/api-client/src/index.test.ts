@@ -6,6 +6,8 @@ import {
   createReviewPin,
   loginAccount,
   registerAccount,
+  resendVerification,
+  verifyEmail,
 } from './index';
 
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), {
@@ -41,9 +43,9 @@ describe('apiRequest', () => {
   });
 
   it('maps API problem details and field errors to ApiError', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ code: 'BAD_INPUT', detail: 'Bad request', fieldErrors: [{ field: 'email', code: 'invalid', message: 'Invalid' }] }, 400)));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ code: 'BAD_INPUT', detail: 'Bad request', retryAfterSeconds: 42, fieldErrors: [{ field: 'email', code: 'invalid', message: 'Invalid' }] }, 400)));
     await expect(apiRequest('x', { baseUrl: 'http://api.test' })).rejects.toMatchObject({
-      name: 'ApiError', status: 400, code: 'BAD_INPUT', message: 'Bad request', fieldErrors: [{ field: 'email' }],
+      name: 'ApiError', status: 400, code: 'BAD_INPUT', message: 'Bad request', retryAfterSeconds: 42, fieldErrors: [{ field: 'email' }],
     });
   });
 
@@ -80,19 +82,29 @@ describe('apiRequest', () => {
 });
 
 describe('auth and review API operations', () => {
-  it('gets a CSRF token before posting registration or login with it', async () => {
+  it('gets a CSRF token before registration, login and verification operations', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(json({ token: 'csrf-token' }))
-      .mockResolvedValueOnce(json({ id: '1', email: 'a@example.com', createdAt: 'now' }))
+      .mockResolvedValueOnce(json({ email: 'a@example.com', expiresAt: 'later', resendAvailableAt: 'soon' }, 202))
+      .mockResolvedValueOnce(json({ token: 'csrf-token' }))
+      .mockResolvedValueOnce(json({ id: '1', email: 'a@example.com', expiresAt: 'later' }))
+      .mockResolvedValueOnce(json({ token: 'csrf-token' }))
+      .mockResolvedValueOnce(json({ email: 'a@example.com', expiresAt: 'later', resendAvailableAt: 'soon' }, 202))
       .mockResolvedValueOnce(json({ token: 'csrf-token' }))
       .mockResolvedValueOnce(json({ id: '1', email: 'a@example.com', expiresAt: 'later' }));
     vi.stubGlobal('fetch', fetchMock);
     await registerAccount({ email: 'a@example.com', password: 'secret' });
     await loginAccount({ email: 'a@example.com', password: 'secret' });
+    await resendVerification('a@example.com');
+    await verifyEmail('a@example.com', '012345');
     expect(fetchMock.mock.calls[0][0]).toContain('/auth/csrf');
     expect(fetchMock.mock.calls[1][1].headers.get('X-XSRF-TOKEN')).toBe('csrf-token');
     expect(fetchMock.mock.calls[2][0]).toContain('/auth/csrf');
     expect(fetchMock.mock.calls[3][1].headers.get('X-XSRF-TOKEN')).toBe('csrf-token');
+    expect(fetchMock.mock.calls[5][0]).toContain('/auth/verification/resend');
+    expect(fetchMock.mock.calls[5][1].headers.get('X-XSRF-TOKEN')).toBe('csrf-token');
+    expect(fetchMock.mock.calls[7][0]).toContain('/auth/verification/verify');
+    expect(JSON.parse(fetchMock.mock.calls[7][1].body)).toEqual({ email: 'a@example.com', code: '012345' });
   });
 
   it('encodes IDs and sends review pin/comment payloads', async () => {

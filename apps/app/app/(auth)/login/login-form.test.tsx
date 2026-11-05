@@ -21,7 +21,7 @@ function renderForm() {
 }
 
 describe('LoginForm', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => { vi.clearAllMocks(); window.sessionStorage.clear(); window.localStorage.clear(); });
 
   it('shows validation errors and does not call the API for invalid input', async () => {
     const user = userEvent.setup();
@@ -54,6 +54,21 @@ describe('LoginForm', () => {
     await user.click(screen.getByRole('button', { name: 'Zaloguj się' }));
     expect(await screen.findByText('E-mail lub hasło są nieprawidłowe.')).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('reopens email verification when a returning user has not verified yet', async () => {
+    const user = userEvent.setup();
+    const { ApiError } = await import('@markerit/api-client');
+    loginAccount.mockRejectedValue(new ApiError(403, 'EMAIL_NOT_VERIFIED', 'verify first'));
+    renderForm();
+    await user.type(screen.getByLabelText('Adres e-mail'), 'pending@example.com');
+    await user.type(screen.getByLabelText('Hasło'), 'long-password-123');
+    await user.click(screen.getByRole('button', { name: 'Zaloguj się' }));
+
+    await waitFor(() => expect(loginAccount).toHaveBeenCalledWith({ email: 'pending@example.com', password: 'long-password-123' }));
+    expect(window.sessionStorage.getItem('markerit.pending-email-verification')).toBe('pending@example.com');
+    expect(await screen.findByText('Potwierdź swój e-mail')).toBeInTheDocument();
+    expect(screen.getByText(/pending@example.com/)).toBeInTheDocument();
   });
 
   it('clears server errors when the user edits a field', async () => {
