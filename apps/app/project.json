@@ -3,5 +3,17 @@
   "name": "app",
   "projectType": "application",
   "sourceRoot": "apps/app/app",
-  "tags": ["type:application", "scope:app", "platform:web"]
+  "tags": ["type:application", "scope:app", "platform:web"],
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm exec vitest run", "cwd": "." },
+      "cache": true
+    },
+    "test:coverage": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm exec vitest run --coverage", "cwd": "." },
+      "cache": true
+    }
+  }
 }
