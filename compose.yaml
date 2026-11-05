@@ -54,17 +54,33 @@ services:
     depends_on:
       database:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     environment:
       GRADLE_USER_HOME: /home/gradle/.gradle
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:-markerit}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-markerit}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-markerit_dev}
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
+      EMAIL_OTP_PEPPER: ${EMAIL_OTP_PEPPER:-markerit-local-otp-pepper-change-this-before-production-please}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@markerit.local}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_API_URL: ${RESEND_API_URL:-https://api.resend.com/emails}
     ports:
       - "8080:8080"
     volumes:
       - .:/workspace
       - gradle_cache:/home/gradle/.gradle
     init: true
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "8025:8025"
+    restart: unless-stopped
 
   database:
     image: postgres:17-alpine

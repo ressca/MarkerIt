@@ -130,7 +130,8 @@ public class SecurityConfiguration {
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/health", "/api/v1/auth/csrf", "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+                        .requestMatchers("/api/health", "/api/v1/auth/csrf", "/api/v1/auth/register", "/api/v1/auth/login",
+                                "/api/v1/auth/verification/resend", "/api/v1/auth/verification/verify").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(resourceServer -> resourceServer
                         .bearerTokenResolver(bearerTokenResolver)

@@ -9,20 +9,29 @@ import { Input } from '@markerit/ui/components/input';
 import { Label } from '@markerit/ui/components/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@markerit/ui/components/popover';
 import Link from 'next/link';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuthCopy } from '../components/auth-shell';
+import { EmailVerificationCard, pendingVerificationStorageKey } from '../components/email-verification-card';
 
 type FormField = keyof RegisterAccountInput;
 type FieldErrors = Partial<Record<FormField, string>>;
 
 export function RegisterForm() {
   const copy = useAuthCopy();
+  const router = useRouter();
   const [values, setValues] = useState<RegisterAccountInput>({ email: '', password: '', confirmPassword: '' });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState('');
-  const [complete, setComplete] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [resendAvailableAt, setResendAvailableAt] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
   const [strengthOpen, setStrengthOpen] = useState(false);
+
+  useEffect(() => {
+    const pendingEmail = window.sessionStorage.getItem(pendingVerificationStorageKey);
+    if (pendingEmail) setVerificationEmail(pendingEmail);
+  }, []);
 
   const passwordChecks = {
     minimumLength: values.password.length >= 12,
@@ -61,11 +70,18 @@ export function RegisterForm() {
     setSubmitting(true);
     setFormError('');
     try {
-      await registerAccount({ email: result.data.email, password: result.data.password });
-      setComplete(true);
+      const challenge = await registerAccount({ email: result.data.email, password: result.data.password });
+      window.sessionStorage.setItem(pendingVerificationStorageKey, challenge.email);
+      setVerificationEmail(challenge.email);
+      setResendAvailableAt(challenge.resendAvailableAt);
     } catch (error) {
       if (error instanceof ApiError && error.code === 'EMAIL_ALREADY_REGISTERED') {
         setFieldErrors((current) => ({ ...current, email: 'emailExists' }));
+      } else if (error instanceof ApiError && ['OTP_RESEND_WAIT', 'OTP_RESEND_LIMIT'].includes(error.code)) {
+        window.sessionStorage.setItem(pendingVerificationStorageKey, result.data.email);
+        setVerificationEmail(result.data.email);
+        if (error.retryAfterSeconds) setResendAvailableAt(new Date(Date.now() + error.retryAfterSeconds * 1000).toISOString());
+        setFormError(error.code === 'OTP_RESEND_LIMIT' ? 'otpResendLimit' : 'otpResendWait');
       } else if (error instanceof ApiError && error.code === 'NETWORK_ERROR') {
         setFormError('networkError');
       } else if (error instanceof ApiError && error.code === 'HTTP_ERROR') {
@@ -83,17 +99,18 @@ export function RegisterForm() {
     return copy[code as keyof typeof copy] ?? copy.requestError;
   }
 
-  if (complete) {
+  if (verificationEmail) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">{copy.registerTitle}</CardTitle>
-          <CardDescription role="status">{copy.registerSuccess}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button nativeButton={false} className="w-full" render={<Link href="/login" />}>{copy.signInLink}</Button>
-        </CardContent>
-      </Card>
+      <EmailVerificationCard
+        email={verificationEmail}
+        resendAvailableAt={resendAvailableAt}
+        onChangeEmail={() => {
+          window.sessionStorage.removeItem(pendingVerificationStorageKey);
+          setVerificationEmail('');
+          setResendAvailableAt(undefined);
+        }}
+        onVerified={() => { router.replace('/'); router.refresh(); }}
+      />
     );
   }
 
@@ -127,7 +144,7 @@ export function RegisterForm() {
               <Input className="h-11" id="register-password" type="password" autoComplete="new-password" required value={values.password} aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password ? 'register-password-error' : 'register-password-hint'} onChange={(event) => updateField('password', event.target.value)} />
               <p id="register-password-hint" className="text-xs text-muted-foreground">{copy.passwordHint}</p>
               {fieldErrors.password && <p id="register-password-error" role="alert" className="text-sm text-destructive">{errorText(fieldErrors.password)}</p>}
-              <PopoverContent align="end" className="space-y-3" aria-label={copy.passwordStrengthTitle}>
+              <PopoverContent initialFocus={false} align="end" className="space-y-3" aria-label={copy.passwordStrengthTitle}>
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-medium">{copy.passwordStrengthTitle}</p>
                   <span className="text-xs text-muted-foreground" aria-live="polite">

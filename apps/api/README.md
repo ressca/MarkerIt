@@ -25,4 +25,8 @@ The health endpoint `GET /api/health` returns:
 {"status":"ok"}
 ```
 
-For the full development stack, including PostgreSQL, run `docker compose up --build` from the repository root. The Compose API service watches Java source changes and restarts the application.
+For the full development stack, including PostgreSQL and Mailpit, run `docker compose up --build` from the repository root. Open `http://localhost:8025` to read verification emails; the Compose API sends them to Mailpit over SMTP. The Compose API service watches Java source changes and restarts the application.
+
+New accounts remain inactive until their email is verified. Verification codes expire after 10 minutes, allow five failed guesses, and can be resent once per minute (up to five deliveries per hour). Returning users can continue from the verification card on the registration page, or sign in with their password to reopen that card. Resend requests for unknown or already verified addresses return the same public response to reduce email enumeration.
+
+For production, activate the `prod` Spring profile and configure `EMAIL_OTP_PEPPER` with a random secret of at least 32 UTF-8 bytes, `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, and a verified sender address in `EMAIL_FROM`. The Resend adapter sends the same responsive HTML and plain-text email templates used by the local SMTP adapter.

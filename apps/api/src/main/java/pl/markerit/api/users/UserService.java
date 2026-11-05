@@ -41,4 +41,14 @@ public class UserService {
         boolean passwordMatches = passwordEncoder.matches(rawPassword, passwordHash);
         return user.filter(ignored -> passwordMatches);
     }
+
+    @Transactional(readOnly = true)
+    public java.util.Optional<User> findByEmail(String email) {
+        return users.findByEmail(email.trim().toLowerCase(java.util.Locale.ROOT));
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Optional<User> findById(java.util.UUID id) {
+        return users.findById(id);
+    }
 }

@@ -1,0 +1,7 @@
+app:
+  security:
+    email-otp-pepper: ${EMAIL_OTP_PEPPER}
+  email:
+    provider: ${EMAIL_PROVIDER:resend}
+    from: ${EMAIL_FROM}
+    resend-api-key: ${RESEND_API_KEY}

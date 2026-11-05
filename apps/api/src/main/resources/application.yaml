@@ -7,6 +7,12 @@ spring:
     enabled: true
   jpa:
     open-in-view: false
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS:false}
 app:
   security:
     jwt-secret: ${JWT_SECRET:markerit-local-development-secret-please-change-this}
@@ -16,3 +22,9 @@ app:
     login-rate-limit:
       max-attempts: ${LOGIN_RATE_LIMIT_MAX_ATTEMPTS:10}
       window: ${LOGIN_RATE_LIMIT_WINDOW:PT15M}
+    email-otp-pepper: ${EMAIL_OTP_PEPPER:markerit-local-otp-pepper-change-this-before-production-please}
+  email:
+    provider: ${EMAIL_PROVIDER:smtp}
+    from: ${EMAIL_FROM:noreply@markerit.local}
+    resend-api-key: ${RESEND_API_KEY:}
+    resend-api-url: ${RESEND_API_URL:https://api.resend.com/emails}

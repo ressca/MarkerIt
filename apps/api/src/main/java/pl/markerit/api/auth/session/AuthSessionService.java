@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.markerit.api.auth.InvalidCredentialsException;
+import pl.markerit.api.auth.EmailNotVerifiedException;
 import pl.markerit.api.users.User;
 import pl.markerit.api.users.UserService;
 
@@ -32,6 +33,18 @@ public class AuthSessionService {
     @Transactional
     public LoginSession login(String email, String password) {
         User user = users.authenticate(email, password).orElseThrow(InvalidCredentialsException::new);
+        if (!user.isEmailVerified()) throw new EmailNotVerifiedException();
+        return createSession(user);
+    }
+
+    @Transactional
+    public LoginSession loginVerifiedUser(java.util.UUID userId) {
+        User user = users.findById(userId).orElseThrow(InvalidCredentialsException::new);
+        if (!user.isEmailVerified()) throw new EmailNotVerifiedException();
+        return createSession(user);
+    }
+
+    private LoginSession createSession(User user) {
         Instant issuedAt = Instant.now();
         UserSession session = sessions.save(new UserSession(UUID.randomUUID(), user, issuedAt.plus(tokenLifetime)));
         String token = jwtTokens.create(user, session, issuedAt);

@@ -8,8 +8,9 @@ import { Input } from '@markerit/ui/components/input';
 import { Label } from '@markerit/ui/components/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useAuthCopy } from '../components/auth-shell';
+import { EmailVerificationCard, pendingVerificationStorageKey } from '../components/email-verification-card';
 
 type FormField = keyof LoginAccountInput;
 type FieldErrors = Partial<Record<FormField, string>>;
@@ -21,6 +22,12 @@ export function LoginForm() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+
+  useEffect(() => {
+    const pendingEmail = window.sessionStorage.getItem(pendingVerificationStorageKey);
+    if (pendingEmail) setVerificationEmail(pendingEmail);
+  }, []);
 
   function updateField(field: FormField, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -55,6 +62,9 @@ export function LoginForm() {
     } catch (error) {
       if (error instanceof ApiError && error.code === 'INVALID_CREDENTIALS') {
         setFormError('invalidCredentials');
+      } else if (error instanceof ApiError && error.code === 'EMAIL_NOT_VERIFIED') {
+        window.sessionStorage.setItem(pendingVerificationStorageKey, result.data.email);
+        setVerificationEmail(result.data.email);
       } else if (error instanceof ApiError && error.code === 'NETWORK_ERROR') {
         setFormError('networkError');
       } else if (error instanceof ApiError && error.code === 'HTTP_ERROR') {
@@ -65,6 +75,20 @@ export function LoginForm() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (verificationEmail) {
+    return (
+      <EmailVerificationCard
+        email={verificationEmail}
+        returning
+        onChangeEmail={() => {
+          window.sessionStorage.removeItem(pendingVerificationStorageKey);
+          setVerificationEmail('');
+        }}
+        onVerified={() => { router.replace('/'); router.refresh(); }}
+      />
+    );
   }
 
   return (
