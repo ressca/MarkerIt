@@ -23,9 +23,15 @@ describe('RegisterForm', () => {
     renderForm();
     await user.click(screen.getByRole('button', { name: 'Utwórz konto' }));
     expect(await screen.findByText('Podaj adres e-mail.')).toBeInTheDocument();
-    expect(screen.getByText('Hasło musi mieć co najmniej 12 znaków.')).toBeInTheDocument();
+    expect(screen.getByText('Hasło musi mieć co najmniej 8 znaków.')).toBeInTheDocument();
     expect(screen.getByText('Powtórz hasło.')).toBeInTheDocument();
     expect(registerAccount).not.toHaveBeenCalled();
+  });
+
+  it('shows the 8-character password requirement beside the password field', () => {
+    renderForm();
+    expect(screen.getByText('Użyj co najmniej 8 znaków.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Pokaż siłę hasła' })).not.toBeInTheDocument();
   });
 
   it('creates the account and opens the email verification card', async () => {

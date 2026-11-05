@@ -14,7 +14,7 @@ import {
 
 describe('account schemas', () => {
   it('trims and accepts valid registration details', () => {
-    expect(registerAccountSchema.parse({ email: ' user@example.com ', password: '123456789012', confirmPassword: '123456789012' }).email)
+    expect(registerAccountSchema.parse({ email: ' user@example.com ', password: '12345678', confirmPassword: '12345678' }).email)
       .toBe('user@example.com');
   });
   it.each([

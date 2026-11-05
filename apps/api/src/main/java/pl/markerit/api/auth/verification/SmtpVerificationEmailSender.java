@@ -22,7 +22,7 @@ public class SmtpVerificationEmailSender implements VerificationEmailSender {
     public void sendVerification(String recipient, String code, boolean polish) {
         try {
             var message = mailSender.createMimeMessage();
-            var helper = new MimeMessageHelper(message, "UTF-8");
+            var helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(from, "markerIt");
             helper.setTo(recipient);
             helper.setSubject(VerificationEmailTemplate.subject(polish));
