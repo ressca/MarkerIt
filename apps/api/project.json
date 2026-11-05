@@ -13,6 +13,14 @@
       },
       "cache": false,
       "continuous": true
+    },
+    "test:coverage": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "gradle test jacocoCoverageVerification",
+        "cwd": "apps/api"
+      },
+      "cache": true
     }
   }
 }
