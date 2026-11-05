@@ -13,6 +13,7 @@ const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 export default function HomePage() {
   const [locale, setLocale] = useState<Locale>('pl');
   const [hydrated, setHydrated] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const copy = getMessages(locale);
 
   useEffect(() => {
@@ -39,18 +40,29 @@ export default function HomePage() {
     }
   }, [copy.metadata.description, copy.metadata.title, hydrated, locale]);
 
+  useEffect(() => {
+    const updateScrollState = () => setIsScrolled(window.scrollY > 8);
+    updateScrollState();
+    window.addEventListener('scroll', updateScrollState, { passive: true });
+    return () => window.removeEventListener('scroll', updateScrollState);
+  }, []);
+
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <header id="home" className="border-b border-border/70">
-        <div className="mx-auto grid min-h-16 max-w-7xl grid-cols-[1fr_auto] items-center gap-3 px-4 py-3 sm:grid-cols-[auto_1fr_auto] sm:px-8 lg:min-h-20 lg:px-12">
-          <a href="#home" aria-label={copy.homeLabel} className="w-fit text-2xl font-extrabold tracking-[-0.08em]">
+      <header className={`sticky top-0 z-50 border-b transition-[background-color,border-color,box-shadow] duration-300 motion-reduce:transition-none ${isScrolled ? 'border-border/70 bg-background/95 shadow-sm backdrop-blur' : 'border-transparent bg-background'}`}>
+        <div className="mx-auto flex min-h-[68px] max-w-6xl flex-wrap items-center justify-between gap-x-8 gap-y-2 px-4 py-3 sm:px-8 lg:min-h-[76px] lg:px-10">
+          <a href="#home" aria-label={copy.homeLabel} className="flex w-fit items-center text-2xl font-extrabold tracking-[-0.09em]">
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="mr-2 size-[22px] text-primary" fill="none">
+              <path d="M19.5 11.25a7.25 7.25 0 0 1-7.25 7.25c-1.2 0-2.3-.3-3.3-.8L4.5 19l1.1-4.1a7.25 7.25 0 1 1 13.9-3.65Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+              <circle cx="12.25" cy="11.25" r="1.6" fill="currentColor" />
+            </svg>
             marker<span className="text-primary">It</span>
           </a>
-          <nav aria-label={copy.navigationLabel} className="col-span-2 row-start-2 flex justify-center gap-6 text-xs text-muted-foreground sm:col-span-1 sm:col-start-2 sm:row-auto sm:gap-8 sm:text-sm">
+          <nav aria-label={copy.navigationLabel} className="order-3 flex w-full justify-center gap-6 pb-1 text-xs text-muted-foreground sm:order-none sm:w-auto sm:flex-1 sm:pb-0 sm:gap-8 sm:text-sm">
             <a className="transition-colors hover:text-foreground" href="#how-it-works">{copy.howItWorksLink}</a>
-            <a className="transition-colors hover:text-foreground" href="#benefits">{copy.benefitsLink}</a>
+            <a className="transition-colors hover:text-foreground" href="#example">{copy.benefitsLink}</a>
           </nav>
-          <div className="flex items-center justify-self-end gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <ThemeToggle switchToDarkLabel={copy.theme.switchToDark} switchToLightLabel={copy.theme.switchToLight} />
             <div role="group" aria-label={copy.languageLabel} className="flex items-center rounded-lg border border-border p-0.5">
               {(['en', 'pl'] as const).map((option) => (
@@ -66,25 +78,21 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section aria-labelledby="hero-title" className="mx-auto grid max-w-7xl items-center gap-10 px-4 py-12 sm:px-8 sm:py-16 lg:min-h-[640px] lg:grid-cols-2 lg:gap-14 lg:px-12 lg:py-20">
-        <div>
-          <p className="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs">
-            <span className="size-2 rounded-full bg-primary ring-4 ring-primary/15" />{copy.hero.eyebrow}
-          </p>
-          <h1 id="hero-title" className="mt-5 max-w-xl text-5xl font-medium leading-[1.04] tracking-tight sm:text-6xl lg:text-7xl">
+      <section aria-labelledby="hero-title" className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-12 sm:px-8 sm:py-16 lg:min-h-[660px] lg:grid-cols-[.88fr_1.12fr] lg:gap-16 lg:px-10 lg:py-20">
+        <div className="relative z-10">
+          <h1 id="hero-title" className="max-w-xl text-[2.8rem] font-medium leading-[1.02] tracking-[-0.055em] sm:text-6xl lg:text-[4.5rem]">
             {copy.hero.titleFirst}<br /><span className="text-primary">{copy.hero.titleSecond}</span>
           </h1>
-          <p className="mt-5 max-w-md text-sm leading-7 text-muted-foreground sm:text-base">{copy.hero.description}</p>
-          <div className="mt-6 flex flex-wrap items-center gap-5">
-            <Button nativeButton={false} size="lg" className="gap-3 px-5" render={<a href={appUrl} />}>{copy.hero.primaryAction}<span aria-hidden="true">→</span></Button>
+          <p className="mt-6 max-w-md text-sm leading-7 text-muted-foreground sm:text-base">{copy.hero.description}</p>
+          <div className="mt-8 flex flex-wrap items-center gap-5">
+            <Button nativeButton={false} size="lg" className="gap-3 rounded-md px-5 shadow-none" render={<a href={appUrl} />}>{copy.hero.primaryAction}<span aria-hidden="true">↗</span></Button>
             <a className="inline-flex items-center gap-2 text-sm font-semibold hover:text-primary" href="#how-it-works">
               {copy.hero.secondaryAction}<span aria-hidden="true" className="text-base text-primary">↓</span>
             </a>
           </div>
-          <p className="mt-7 text-xs text-muted-foreground">{copy.hero.note}</p>
         </div>
 
-        <Card aria-label={copy.preview.label} className="mx-auto w-full max-w-xl gap-0 overflow-hidden rounded-xl p-3 shadow-xl shadow-foreground/5 sm:p-4 lg:rotate-1">
+        <Card id="example" aria-label={copy.preview.label} className="relative mx-auto w-full max-w-xl gap-0 overflow-visible rounded-none border-0 bg-transparent p-0 shadow-none before:absolute before:-inset-3 before:-z-10 before:border before:border-border/70 before:content-[''] sm:before:-inset-5">
           <CardHeader className="flex min-h-12 flex-row items-start justify-between gap-2 p-0 pb-3">
             <div className="flex min-w-0 items-center gap-2.5">
               <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><span aria-hidden="true">▧</span></span>
@@ -95,18 +103,22 @@ export default function HomePage() {
             </Badge>
           </CardHeader>
           <CardContent className="p-0">
-            <div aria-label={copy.preview.artworkTitle} className="relative h-[clamp(245px,72vw,336px)] overflow-hidden rounded-md bg-[linear-gradient(145deg,#dce7d5_0%,#edf0df_43%,#d5dfc9_100%)] dark:bg-[linear-gradient(145deg,#29352b_0%,#252d25_43%,#1b241d_100%)]">
-              <div className="absolute inset-0 bg-[linear-gradient(35deg,transparent_47%,rgba(255,255,255,.38)_48%,transparent_49%),linear-gradient(120deg,transparent_61%,rgba(102,133,88,.13)_62%,transparent_63%)] dark:opacity-25" />
-              <div className="absolute -right-20 top-8 size-60 rounded-full border border-foreground/15 sm:-right-7 sm:size-[275px]" />
-              <div className="absolute -right-12 top-14 size-44 rounded-full border border-foreground/15 sm:right-1 sm:top-16 sm:size-[207px]" />
-              <div className="absolute right-1 top-12 size-32 rounded-full bg-[radial-gradient(circle_at_35%_34%,#faf6dc,#c7d1a5_74%)] shadow-xl dark:bg-[radial-gradient(circle_at_35%_34%,#e4e9c5,#82916b_74%)] sm:right-7 sm:size-[151px]" />
-              <div className="absolute left-5 top-16 z-10 text-foreground sm:left-8 sm:top-20">
+            <div aria-label={copy.preview.artworkTitle} className="relative h-[clamp(245px,72vw,336px)] overflow-hidden bg-[#e5e6d7] dark:bg-[#252b24]">
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_49.8%,rgba(40,50,35,.1)_50%,transparent_50.2%),linear-gradient(0deg,transparent_49.8%,rgba(40,50,35,.1)_50%,transparent_50.2%)] bg-[length:36px_36px] opacity-50" />
+              <div className="absolute inset-y-0 right-0 w-[42%] bg-[#c8d0b5] dark:bg-[#414b38]" />
+              <div className="absolute right-[7%] top-[13%] h-[72%] w-[31%] rotate-3 border border-foreground/20 bg-[#eeeede] shadow-[10px_12px_0_rgba(50,60,40,.12)] dark:bg-[#d8ddc5]">
+                <div className="absolute inset-x-[12%] top-[13%] h-[42%] bg-[linear-gradient(145deg,#a0a982_0%,#d7d9b8_46%,#788064_47%,#545c4a_100%)]" />
+                <div className="absolute inset-x-[12%] top-[63%] h-px bg-foreground/40" />
+                <span className="absolute left-[12%] top-[70%] h-px w-[38%] bg-foreground/50" />
+                <span className="absolute left-[12%] top-[77%] text-[6px] uppercase tracking-[0.12em] text-foreground">SP / 01</span>
+              </div>
+              <div className="absolute left-5 top-10 z-10 text-[#30382d] sm:left-8 sm:top-14 dark:text-[#e8eadc]">
                 <small className="block text-[8px] uppercase tracking-[0.16em]">{copy.preview.artworkTitle}</small>
                 <strong className="mt-3 block text-3xl font-medium leading-none tracking-tight sm:text-4xl">{copy.preview.artworkLineFirst}<br />{copy.preview.artworkLineSecond}</strong>
-                <span className="mt-3 block text-[9px]">{copy.preview.artworkSubtitle}</span>
+                <span className="mt-3 block max-w-28 text-[9px] leading-relaxed">{copy.preview.artworkSubtitle}</span>
               </div>
-              <span className="absolute right-[28%] top-[34%] grid size-7 rotate-[-45deg] place-items-center rounded-full rounded-bl-sm bg-foreground text-xs font-bold text-background shadow-md"><span className="rotate-45">1</span></span>
-              <span className="absolute bottom-[22%] right-[13%] grid size-7 rotate-[-45deg] place-items-center rounded-full rounded-bl-sm bg-primary text-xs font-bold text-primary-foreground shadow-md"><span className="rotate-45">2</span></span>
+              <span className="absolute left-[59%] top-[29%] grid size-7 place-items-center rounded-full border-2 border-background bg-foreground text-xs font-bold text-background shadow-sm">1</span>
+              <span className="absolute bottom-[23%] right-[13%] grid size-7 place-items-center rounded-full border-2 border-background bg-primary text-xs font-bold text-primary-foreground shadow-sm">2</span>
               <span className="absolute bottom-3.5 left-3.5 text-[8px] uppercase tracking-widest text-foreground/70">{copy.preview.artworkCaption}</span>
             </div>
             <div className="flex items-center gap-2.5 px-1 py-3">
@@ -125,26 +137,25 @@ export default function HomePage() {
         </Card>
       </section>
 
-      <section id="how-it-works" aria-labelledby="process-title" className="grid gap-8 bg-muted/50 px-4 py-14 sm:px-8 sm:py-16 lg:grid-cols-[.8fr_1.2fr] lg:items-center lg:gap-16 lg:px-[max(calc((100vw-1160px)/2),3rem)] lg:py-20">
+      <section id="how-it-works" aria-labelledby="process-title" className="grid gap-8 border-y border-border/60 bg-muted/30 px-4 py-14 sm:px-8 sm:py-16 lg:grid-cols-[.8fr_1.2fr] lg:items-center lg:gap-16 lg:px-[max(calc((100vw-1080px)/2),3rem)] lg:py-20">
         <div id="benefits">
           <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs">{copy.process.eyebrow}</p>
           <h2 id="process-title" className="text-4xl font-medium leading-tight tracking-tight sm:text-5xl">{copy.process.titleFirst}<br /><span className="text-primary">{copy.process.titleSecond}</span></h2>
           <p className="mt-4 max-w-sm text-sm leading-7 text-muted-foreground">{copy.process.description}</p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-0 border-y border-border/70 sm:grid-cols-3">
           {copy.process.steps.map((step, index) => (
-            <Card className="min-h-36 gap-0 rounded-xl bg-background p-5 shadow-none sm:p-4 lg:min-h-40 lg:p-5" key={step.title}>
-              <span className="text-xs font-bold tracking-widest text-primary">{String(index + 1).padStart(2, '0')}</span>
-              <h3 className="mt-5 text-sm font-bold">{step.title}</h3>
+            <article className="min-h-36 border-b border-border/70 py-5 last:border-0 sm:border-b-0 sm:border-r sm:px-4 sm:first:pl-0 sm:last:border-0 lg:min-h-40 lg:py-4" key={step.title}>
+              <span className="text-xs font-semibold tabular-nums text-primary">0{index + 1}<span className="ml-2 text-muted-foreground">/ 03</span></span>
+              <h3 className="mt-5 text-sm font-bold tracking-tight">{step.title}</h3>
               <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{step.description}</p>
-            </Card>
+            </article>
           ))}
         </div>
       </section>
 
       <footer className="mx-auto flex min-h-24 max-w-7xl flex-wrap items-center justify-between gap-x-5 gap-y-2 px-4 py-6 text-[10px] text-muted-foreground sm:px-8 lg:px-12">
         <a href="#home" aria-label={copy.homeLabel} className="text-xl font-extrabold tracking-[-0.08em] text-foreground">marker<span className="text-primary">It</span></a>
-        <span className="order-3 w-full sm:order-none sm:w-auto">{copy.footer}</span>
         <span>© 2026 markerIt</span>
       </footer>
     </main>
