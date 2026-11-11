@@ -198,10 +198,20 @@ public class AssetService {
     @Transactional
     public void delete(UUID userId, UUID assetId) {
         Asset asset = requireAsset(assetId);
-        workspaces.requireProjectManager(asset.getWorkspaceId(), userId);
+        boolean referenced = assets.isReferencedByReviewVersion(assetId)
+                || assets.isReferencedByPinCommentAttachment(assetId);
+        // Any workspace member (including VIEWER) may discard an attachment
+        // they uploaded themselves, as long as it is not referenced yet. This
+        // keeps best-effort cleanup after a failed comment submission working
+        // without granting viewers broader asset-delete permissions.
+        boolean ownUnreferencedAttachment = Asset.PURPOSE_ATTACHMENT.equals(asset.getPurpose())
+                && userId.equals(asset.getOwnerUserId())
+                && !referenced;
+        if (!ownUnreferencedAttachment) {
+            workspaces.requireProjectManager(asset.getWorkspaceId(), userId);
+        }
 
-        if (assets.isReferencedByReviewVersion(assetId)
-                || assets.isReferencedByPinCommentAttachment(assetId)) {
+        if (referenced) {
             throw assetInUse();
         }
 

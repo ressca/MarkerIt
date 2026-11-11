@@ -47,6 +47,36 @@ describe('apiErrorMessage', () => {
     );
   });
 
+  it('maps discussion and attachment errors to localized copy', () => {
+    expect(apiErrorMessage(new ApiError(404, 'PIN_NOT_FOUND', 'missing'), en, fallback)).toBe(
+      en.project.pinNotFoundError,
+    );
+    expect(apiErrorMessage(new ApiError(404, 'COMMENT_NOT_FOUND', 'missing'), pl, fallback)).toBe(
+      pl.project.commentNotFoundError,
+    );
+    expect(apiErrorMessage(new ApiError(400, 'INVALID_COORDINATES', 'bad'), en, fallback)).toBe(
+      en.project.invalidCoordinatesError,
+    );
+    expect(apiErrorMessage(new ApiError(400, 'COMMENT_BODY_REQUIRED', 'empty'), en, fallback)).toBe(
+      en.project.commentRequired,
+    );
+    expect(apiErrorMessage(new ApiError(403, 'COMMENT_FORBIDDEN', 'forbidden'), en, fallback)).toBe(
+      en.project.commentForbiddenError,
+    );
+    expect(apiErrorMessage(new ApiError(400, 'COMMENT_DEPTH_EXCEEDED', 'deep'), en, fallback)).toBe(
+      en.project.commentDepthError,
+    );
+    expect(apiErrorMessage(new ApiError(400, 'TOO_MANY_ATTACHMENTS', 'many'), en, fallback)).toBe(
+      en.project.attachmentLimitError,
+    );
+    expect(apiErrorMessage(new ApiError(404, 'ATTACHMENT_NOT_FOUND', 'missing'), en, fallback)).toBe(
+      en.project.attachmentNotFoundError,
+    );
+    expect(
+      apiErrorMessage(new ApiError(400, 'INVALID_PARENT_COMMENT', 'parent'), en, fallback),
+    ).toBe(en.project.commentNotFoundError);
+  });
+
   it('falls back for unknown codes and non-API failures', () => {
     expect(apiErrorMessage(new ApiError(500, 'SOMETHING_ELSE', 'boom'), en, fallback)).toBe(fallback);
     expect(apiErrorMessage(new Error('offline'), en, fallback)).toBe(fallback);

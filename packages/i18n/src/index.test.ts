@@ -22,6 +22,18 @@ describe('localization', () => {
     expect(getMessages('en').project.projectClosedError).toBeTruthy();
   });
 
+  it('provides canvas, pin, comment and realtime copy in both languages', () => {
+    expect(getMessages('en').project.discussionTitle).toBe('Discussion');
+    expect(getMessages('pl').project.discussionTitle).toBe('Dyskusja');
+    expect(getMessages('en').project.addPinTitle).toBeTruthy();
+    expect(getMessages('pl').project.pinLabel).toContain('#');
+    expect(getMessages('en').project.attachmentsHint).toBeTruthy();
+    expect(getMessages('pl').project.realtimeReconnecting).toBeTruthy();
+    expect(getMessages('pl').project.realtimeConnecting).toBeTruthy();
+    expect(getMessages('en').project.editCommentFor).toContain('{name}');
+    expect(getMessages('en').project.discussionClosedNotice).toContain('closed');
+  });
+
   it('recognizes supported language values', () => {
     expect(isLocale('en')).toBe(true);
     expect(isLocale('pl')).toBe(true);

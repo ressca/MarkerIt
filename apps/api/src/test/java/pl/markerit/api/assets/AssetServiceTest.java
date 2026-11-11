@@ -362,6 +362,53 @@ class AssetServiceTest {
         verify(storage, never()).deleteObject(anyString());
     }
 
+    @Test void letsUploaderDeleteOwnUnreferencedAttachment() {
+        Asset asset = asset(UUID.randomUUID());
+        when(asset.getPurpose()).thenReturn(Asset.PURPOSE_ATTACHMENT);
+        when(asset.getOwnerUserId()).thenReturn(userId);
+        when(assets.findByIdAndDeletedAtIsNull(asset.getId())).thenReturn(Optional.of(asset));
+        when(assets.isReferencedByReviewVersion(asset.getId())).thenReturn(false);
+        when(assets.isReferencedByPinCommentAttachment(asset.getId())).thenReturn(false);
+
+        service.delete(userId, asset.getId());
+
+        verify(workspaces, never()).requireProjectManager(workspaceId, userId);
+        verify(assets).delete(asset);
+        verify(storage).deleteObject(asset.getStorageKey());
+    }
+
+    @Test void forbidsDeletingAnotherUsersUnreferencedAttachment() {
+        Asset asset = asset(UUID.randomUUID());
+        when(asset.getPurpose()).thenReturn(Asset.PURPOSE_ATTACHMENT);
+        when(asset.getOwnerUserId()).thenReturn(UUID.randomUUID());
+        when(assets.findByIdAndDeletedAtIsNull(asset.getId())).thenReturn(Optional.of(asset));
+        when(assets.isReferencedByReviewVersion(asset.getId())).thenReturn(false);
+        when(assets.isReferencedByPinCommentAttachment(asset.getId())).thenReturn(false);
+        when(workspaces.requireProjectManager(workspaceId, userId))
+                .thenThrow(new ForbiddenAccessException("WORKSPACE_FORBIDDEN", "Brak dostępu."));
+
+        assertThrows(ForbiddenAccessException.class,
+                () -> service.delete(userId, asset.getId()));
+        verify(assets, never()).delete(any());
+        verify(storage, never()).deleteObject(anyString());
+    }
+
+    @Test void forbidsUploaderDeletingOwnAttachmentWhileReferenced() {
+        Asset asset = asset(UUID.randomUUID());
+        when(asset.getPurpose()).thenReturn(Asset.PURPOSE_ATTACHMENT);
+        when(asset.getOwnerUserId()).thenReturn(userId);
+        when(assets.findByIdAndDeletedAtIsNull(asset.getId())).thenReturn(Optional.of(asset));
+        when(assets.isReferencedByReviewVersion(asset.getId())).thenReturn(false);
+        when(assets.isReferencedByPinCommentAttachment(asset.getId())).thenReturn(true);
+        when(workspaces.requireProjectManager(workspaceId, userId))
+                .thenThrow(new ForbiddenAccessException("WORKSPACE_FORBIDDEN", "Brak dostępu."));
+
+        assertThrows(ForbiddenAccessException.class,
+                () -> service.delete(userId, asset.getId()));
+        verify(assets, never()).delete(any());
+        verify(storage, never()).deleteObject(anyString());
+    }
+
     @Test void translatesForeignKeyViolationDuringDelete() {
         Asset asset = asset(UUID.randomUUID());
         when(assets.findByIdAndDeletedAtIsNull(asset.getId())).thenReturn(Optional.of(asset));

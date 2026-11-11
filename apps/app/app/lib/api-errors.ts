@@ -47,6 +47,23 @@ export function apiErrorMessage(
     case 'PROJECT_NOT_FOUND':
     case 'REVIEW_NOT_FOUND':
       return messages.project.notFoundError;
+    case 'PIN_NOT_FOUND':
+      return messages.project.pinNotFoundError;
+    case 'COMMENT_NOT_FOUND':
+    case 'INVALID_PARENT_COMMENT':
+      return messages.project.commentNotFoundError;
+    case 'INVALID_COORDINATES':
+      return messages.project.invalidCoordinatesError;
+    case 'COMMENT_BODY_REQUIRED':
+      return messages.project.commentRequired;
+    case 'COMMENT_FORBIDDEN':
+      return messages.project.commentForbiddenError;
+    case 'COMMENT_DEPTH_EXCEEDED':
+      return messages.project.commentDepthError;
+    case 'TOO_MANY_ATTACHMENTS':
+      return messages.project.attachmentLimitError;
+    case 'ATTACHMENT_NOT_FOUND':
+      return messages.project.attachmentNotFoundError;
     case 'NETWORK_ERROR':
       return messages.project.networkError;
     default:

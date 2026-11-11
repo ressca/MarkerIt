@@ -1,24 +1,35 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   ApiError,
   closeReview,
+  createPinComment,
   createReviewVersion,
+  createVersionPin,
+  deleteComment,
+  deletePin,
   deleteProjectAsset,
   deleteReview,
   getProject,
   getReview,
+  getReviewDiscussion,
   listProjectAssets,
   listWorkspaceMembers,
   submitReviewApproval,
+  updateComment,
+  updatePin,
   updateReview,
   uploadProjectAsset,
+  uploadProjectAttachment,
 } from '@markerit/api-client';
 import type {
   AssetDto,
+  CommentDto,
+  DiscussionDto,
+  DiscussionPinDto,
   ProjectDto,
   ReviewDecision,
   ReviewDto,
@@ -55,7 +66,6 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
-  ImageIcon,
   MessageSquare,
   Pencil,
   Plus,
@@ -76,8 +86,29 @@ import {
   reviewDecisionLabel,
   reviewStatusLabel,
 } from '../../../../lib/project-labels';
-import { MAX_PROJECT_PHOTOS, MAX_PHOTO_BYTES } from '../../../../lib/project-constants';
+import {
+  MAX_ATTACHMENT_BYTES,
+  MAX_COMMENT_ATTACHMENTS,
+  MAX_PROJECT_PHOTOS,
+  MAX_PHOTO_BYTES,
+} from '../../../../lib/project-constants';
+import {
+  createReviewRealtime,
+  type RealtimeHandle,
+  type RealtimeStatus,
+  type ReviewRealtimeEvent,
+} from '../../../../lib/realtime';
 import { ReviewerPicker } from '../../components/reviewer-picker';
+import { AddPinDialog, type PinPoint } from './components/add-pin-dialog';
+import { DiscussionPanel } from './components/discussion-panel';
+import { ReviewCanvas } from './components/review-canvas';
+import {
+  applyCommentMutation,
+  applyDiscussionEvent,
+  applyPinMutation,
+  markCommentDeleted,
+  removePin,
+} from './discussion-utils';
 import { cn } from 'cn';
 
 interface ReviewThreadPageProps {
@@ -89,6 +120,7 @@ interface ReviewThreadPageProps {
   initialProject?: ProjectDto;
   initialAssets?: AssetDto[];
   initialMembers?: WorkspaceMemberDto[];
+  initialDiscussion?: DiscussionDto;
 }
 
 type AddVersionInput = {
@@ -104,9 +136,14 @@ export function ReviewThreadPage({
   initialProject,
   initialAssets,
   initialMembers,
+  initialDiscussion,
 }: ReviewThreadPageProps) {
   const { locale, messages } = useAppLocale();
   const router = useRouter();
+  // Next's router is stable, but tests/mocks may return a fresh object. Keeping
+  // it in a ref prevents callbacks (and their effects) from churning.
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const hasFixtures = initialReview !== undefined;
 
   const [thread, setThread] = useState<ReviewDto | null>(initialReview ?? null);
@@ -118,12 +155,55 @@ export function ReviewThreadPage({
   const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const [discussion, setDiscussion] = useState<DiscussionDto | null>(initialDiscussion ?? null);
+  const [discussionLoading, setDiscussionLoading] = useState(true);
+  const [discussionError, setDiscussionError] = useState<unknown>(null);
+  const [hoveredPinId, setHoveredPinId] = useState<string | null>(null);
+  const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const [pinPoint, setPinPoint] = useState<PinPoint | null>(null);
+  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>('connecting');
+  const discussionRef = useRef<DiscussionDto | null>(initialDiscussion ?? null);
+  const selectedVersionIdRef = useRef('');
+  const discussionRequestRef = useRef(0);
+  const loadRequestRef = useRef(0);
+  const threadRequestRef = useRef(0);
+  /** Monotonic revision bumped by every mutation/event folded into state. */
+  const revisionRef = useRef(0);
+  const pinEventAtRef = useRef<Map<string, number>>(new Map());
+  const realtimeHandleRef = useRef<RealtimeHandle | null>(null);
+  const previousRealtimeStatusRef = useRef<RealtimeStatus>('connecting');
+  const ownApprovalAtRef = useRef(0);
+  const highlightedPinId = hoveredPinId ?? selectedPinId;
+
   const [decision, setDecision] = useState<ReviewDecision | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [addVersionOpen, setAddVersionOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+  const stopRealtime = useCallback(() => {
+    const handle = realtimeHandleRef.current;
+    realtimeHandleRef.current = null;
+    void handle?.disconnect();
+  }, []);
+
+  const leaveThread = useCallback(() => {
+    stopRealtime();
+    routerRef.current.replace(`/projects/${projectId}`);
+  }, [projectId, stopRealtime]);
+
+  const handleReviewGone = useCallback(
+    (cause: unknown) => {
+      if (cause instanceof ApiError && cause.code === 'REVIEW_NOT_FOUND') {
+        leaveThread();
+        return true;
+      }
+      return false;
+    },
+    [leaveThread],
+  );
+
   const load = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -135,16 +215,19 @@ export function ReviewThreadPage({
         listProjectAssets(projectId),
         listWorkspaceMembers(loadedProject.workspaceId),
       ]);
+      if (requestId !== loadRequestRef.current) return;
       setThread(loadedReview);
       setProject(loadedProject);
       setAssets(loadedAssets);
       setMembers(loadedMembers);
     } catch (cause) {
+      if (requestId !== loadRequestRef.current) return;
+      if (handleReviewGone(cause)) return;
       setError(cause);
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
-  }, [projectId, reviewId]);
+  }, [handleReviewGone, projectId, reviewId]);
 
   useEffect(() => {
     if (hasFixtures) return;
@@ -175,11 +258,370 @@ export function ReviewThreadPage({
   const errorMessage = error
     ? apiErrorMessage(error, messages, messages.project.genericError)
     : null;
+  const discussionErrorMessage = discussionError
+    ? apiErrorMessage(discussionError, messages, messages.project.discussionLoadError)
+    : null;
+  const currentMember = members.find((member) => member.id === initialUser.id);
+  const isWorkspaceAdmin =
+    currentMember?.role === 'ADMIN' || currentMember?.role === 'OWNER';
+  const canWrite = Boolean(currentMember && currentMember.role !== 'VIEWER');
 
-  async function refreshThread() {
-    const loaded = await getReview(reviewId);
-    setThread(loaded);
-    return loaded;
+  const refreshThread = useCallback(
+    async (options: { silent?: boolean } = {}): Promise<ReviewDto | null> => {
+      const requestId = ++threadRequestRef.current;
+      const revision = revisionRef.current;
+      try {
+        const loaded = await getReview(reviewId);
+        if (requestId !== threadRequestRef.current || revisionRef.current !== revision) {
+          return null;
+        }
+        setThread(loaded);
+        return loaded;
+      } catch (cause) {
+        if (handleReviewGone(cause)) return null;
+        if (
+          requestId === threadRequestRef.current &&
+          revisionRef.current === revision &&
+          !options.silent
+        ) {
+          setError(cause);
+        }
+        return null;
+      }
+    },
+    [handleReviewGone, reviewId],
+  );
+
+  const commitDiscussion = useCallback((next: DiscussionDto) => {
+    revisionRef.current += 1;
+    discussionRef.current = next;
+    setDiscussion(next);
+  }, []);
+
+  const loadDiscussion = useCallback(
+    async (versionId: string, options: { silent?: boolean } = {}) => {
+      const requestId = ++discussionRequestRef.current;
+      const revision = revisionRef.current;
+      if (!options.silent) setDiscussionLoading(true);
+      setDiscussionError(null);
+      try {
+        const loaded = await getReviewDiscussion(reviewId, versionId);
+        if (
+          requestId !== discussionRequestRef.current ||
+          selectedVersionIdRef.current !== versionId ||
+          revisionRef.current !== revision
+        ) {
+          return;
+        }
+        discussionRef.current = loaded;
+        setDiscussion(loaded);
+      } catch (cause) {
+        if (handleReviewGone(cause)) return;
+        // A background refresh must never replace a valid feed with an error
+        // banner; the older discussion stays interactive.
+        if (
+          requestId === discussionRequestRef.current &&
+          selectedVersionIdRef.current === versionId &&
+          revisionRef.current === revision &&
+          !options.silent
+        ) {
+          setDiscussionError(cause);
+        }
+      } finally {
+        if (requestId === discussionRequestRef.current) {
+          setDiscussionLoading(false);
+        }
+      }
+    },
+    [handleReviewGone, reviewId],
+  );
+
+  useEffect(() => {
+    discussionRef.current = discussion;
+  }, [discussion]);
+
+  useEffect(() => {
+    const versionId = selectedVersion?.id;
+    if (!versionId) return;
+    selectedVersionIdRef.current = versionId;
+    setSelectedPinId(null);
+    setHoveredPinId(null);
+    setPinPoint(null);
+    if (discussionRef.current?.versionId !== versionId) {
+      discussionRef.current = null;
+      setDiscussion(null);
+    }
+    setDiscussionLoading(true);
+    void loadDiscussion(versionId);
+    return () => {
+      discussionRequestRef.current += 1;
+    };
+  }, [selectedVersion?.id, loadDiscussion]);
+
+  const resync = useCallback(() => {
+    const versionId = selectedVersionIdRef.current;
+    void refreshThread({ silent: true });
+    if (versionId) void loadDiscussion(versionId, { silent: true });
+  }, [loadDiscussion, refreshThread]);
+
+  const handleRealtimeEvent = useCallback(
+    (event: ReviewRealtimeEvent) => {
+      if (event.type === 'REVIEW_DELETED') {
+        leaveThread();
+        return;
+      }
+
+      const versionId = selectedVersionIdRef.current;
+      if (!versionId) return;
+
+      const isReviewLevelEvent =
+        event.type === 'REVIEW_CREATED' ||
+        event.type === 'REVIEW_UPDATED' ||
+        event.type === 'VERSION_CREATED' ||
+        event.type === 'APPROVAL_CREATED' ||
+        event.payloadType === 'REVIEW' ||
+        event.payloadType === 'VERSION' ||
+        event.payloadType === 'APPROVAL';
+
+      if (isReviewLevelEvent) {
+        // Our own approval already refreshed the thread and feed above; the
+        // echoed event does not need a second round trip.
+        if (
+          event.type === 'APPROVAL_CREATED' &&
+          Date.now() - ownApprovalAtRef.current < 3_000
+        ) {
+          return;
+        }
+        void refreshThread({ silent: true });
+        void loadDiscussion(versionId, { silent: true });
+        return;
+      }
+
+      const current = discussionRef.current;
+      if (!current || current.versionId !== versionId) {
+        void loadDiscussion(versionId, { silent: true });
+        return;
+      }
+
+      if (event.versionId && event.versionId !== versionId) return;
+
+      if (
+        (event.type === 'PIN_CREATED' || event.type === 'PIN_UPDATED') &&
+        event.pinId
+      ) {
+        const occurredAt = event.occurredAt ? Date.parse(event.occurredAt) : 0;
+        if (!Number.isNaN(occurredAt) && occurredAt > 0) {
+          const lastApplied = pinEventAtRef.current.get(event.pinId) ?? 0;
+          // A delayed/replayed pin update must not flip RESOLVED back to OPEN.
+          if (lastApplied > 0 && occurredAt < lastApplied) return;
+          pinEventAtRef.current.set(event.pinId, occurredAt);
+        }
+      }
+
+      const next = applyDiscussionEvent(current, event);
+      if (next === null) {
+        void loadDiscussion(versionId, { silent: true });
+        return;
+      }
+      if (next === current) return;
+      commitDiscussion(next);
+      if (event.type === 'PIN_CREATED' && event.pinId) {
+        setSelectedPinId(event.pinId);
+      }
+      if (event.type === 'PIN_DELETED' && event.pinId) {
+        const deletedPinId = event.pinId;
+        pinEventAtRef.current.delete(deletedPinId);
+        setSelectedPinId((previous) => (previous === deletedPinId ? null : previous));
+        setHoveredPinId((previous) => (previous === deletedPinId ? null : previous));
+      }
+    },
+    [commitDiscussion, leaveThread, loadDiscussion, refreshThread],
+  );
+
+  useEffect(() => {
+    const handle = createReviewRealtime({
+      reviewId,
+      onEvent: handleRealtimeEvent,
+      onStatus: (status) => {
+        const previous = previousRealtimeStatusRef.current;
+        previousRealtimeStatusRef.current = status;
+        setRealtimeStatus(status);
+        if (status !== 'connected') return;
+        // Reconnect, recovery from an error and the initial connect all
+        // deserve fresh server state. The revision guard discards stale
+        // responses, so an extra initial fetch is harmless.
+        if (previous !== 'connected') {
+          resync();
+        }
+      },
+      onError: (cause) => {
+        if (cause.message === 'INVALID_REALTIME_EVENT') return;
+        setRealtimeStatus((current) => (current === 'connected' ? 'error' : current));
+      },
+    });
+    realtimeHandleRef.current = handle;
+    return () => {
+      if (realtimeHandleRef.current === handle) realtimeHandleRef.current = null;
+      void handle.disconnect();
+    };
+  }, [handleRealtimeEvent, resync, reviewId]);
+
+  useEffect(() => {
+    const handleOnline = () => resync();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') resync();
+    };
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [resync]);
+
+  async function uploadAttachments(files: File[]): Promise<string[]> {
+    if (files.length === 0) return [];
+    if (files.length > MAX_COMMENT_ATTACHMENTS) {
+      throw new ApiError(400, 'TOO_MANY_ATTACHMENTS', 'too many');
+    }
+    const uploaded: AssetDto[] = [];
+    try {
+      for (const file of files) {
+        if (!['image/png', 'image/jpeg'].includes(file.type)) {
+          throw new ApiError(400, 'UNSUPPORTED_CONTENT_TYPE', 'unsupported');
+        }
+        if (file.size > MAX_ATTACHMENT_BYTES) {
+          throw new ApiError(413, 'ASSET_TOO_LARGE', 'too large');
+        }
+        uploaded.push(await uploadProjectAttachment(projectId, file));
+      }
+      return uploaded.map((asset) => asset.id);
+    } catch (cause) {
+      // Best effort cleanup for partially uploaded attachments.
+      await Promise.allSettled(uploaded.map((asset) => deleteProjectAsset(asset.id)));
+      throw cause;
+    }
+  }
+
+  async function handleAddPin(body: string, files: File[]): Promise<string | null> {
+    if (!selectedVersion || !pinPoint) return messages.project.addPinError;
+    try {
+      const attachmentAssetIds = await uploadAttachments(files);
+      const pin = await createVersionPin(reviewId, selectedVersion.id, {
+        xPercent: pinPoint.xPercent,
+        yPercent: pinPoint.yPercent,
+        body,
+        attachmentAssetIds: attachmentAssetIds.length > 0 ? attachmentAssetIds : undefined,
+      });
+      pinEventAtRef.current.set(pin.id, Date.now());
+      if (discussionRef.current?.versionId === selectedVersion.id) {
+        commitDiscussion(applyPinMutation(discussionRef.current, pin));
+      }
+      setSelectedPinId(pin.id);
+      setPinPoint(null);
+      setNotice(messages.project.pinAdded);
+      return null;
+    } catch (cause) {
+      return apiErrorMessage(cause, messages, messages.project.addPinError);
+    }
+  }
+
+  async function handleReply(
+    pinId: string,
+    parentCommentId: string | null,
+    body: string,
+    files: File[],
+  ): Promise<string | null> {
+    try {
+      const attachmentAssetIds = await uploadAttachments(files);
+      const comment = await createPinComment<CommentDto>(pinId, {
+        body,
+        parentCommentId: parentCommentId ?? undefined,
+        attachmentAssetIds: attachmentAssetIds.length > 0 ? attachmentAssetIds : undefined,
+      });
+      if (discussionRef.current) {
+        commitDiscussion(applyCommentMutation(discussionRef.current, comment));
+      }
+      return null;
+    } catch (cause) {
+      return apiErrorMessage(cause, messages, messages.project.commentCreateError);
+    }
+  }
+
+  async function handleEditComment(
+    comment: CommentDto,
+    body: string,
+  ): Promise<string | null> {
+    try {
+      const updated = await updateComment(comment.id, { body });
+      if (discussionRef.current) {
+        commitDiscussion(applyCommentMutation(discussionRef.current, updated));
+      }
+      return null;
+    } catch (cause) {
+      return apiErrorMessage(cause, messages, messages.project.commentUpdateError);
+    }
+  }
+
+  async function handleDeleteComment(comment: CommentDto): Promise<string | null> {
+    try {
+      await deleteComment(comment.id);
+      if (discussionRef.current) {
+        commitDiscussion(markCommentDeleted(discussionRef.current, comment));
+      }
+      return null;
+    } catch (cause) {
+      return apiErrorMessage(cause, messages, messages.project.commentDeleteError);
+    }
+  }
+
+  async function handleTogglePinStatus(pin: DiscussionPinDto): Promise<string | null> {
+    try {
+      const updated = await updatePin(pin.id, {
+        status: pin.status === 'OPEN' ? 'RESOLVED' : 'OPEN',
+      });
+      pinEventAtRef.current.set(pin.id, Date.now());
+      if (discussionRef.current) {
+        commitDiscussion(applyPinMutation(discussionRef.current, updated));
+      }
+      return null;
+    } catch (cause) {
+      return apiErrorMessage(cause, messages, messages.project.pinStatusError);
+    }
+  }
+
+  async function handleDeletePin(pin: DiscussionPinDto): Promise<string | null> {
+    try {
+      await deletePin(pin.id);
+      if (discussionRef.current) {
+        commitDiscussion(removePin(discussionRef.current, pin.id));
+      }
+      pinEventAtRef.current.delete(pin.id);
+      setSelectedPinId((previous) => (previous === pin.id ? null : previous));
+      setHoveredPinId((previous) => (previous === pin.id ? null : previous));
+      return null;
+    } catch (cause) {
+      return apiErrorMessage(cause, messages, messages.project.pinDeleteError);
+    }
+  }
+
+  function focusPin(pinId: string) {
+    setSelectedPinId(pinId);
+    document.getElementById(`pin-marker-${pinId}`)?.scrollIntoView?.({
+      behavior: 'smooth',
+      block: 'center',
+    });
+  }
+
+  function selectPin(pinId: string) {
+    setSelectedPinId(pinId);
+    const firstComment = discussionRef.current?.comments.find(
+      (comment) => comment.pinId === pinId,
+    );
+    const target = firstComment
+      ? document.getElementById(`pin-comment-${firstComment.id}`)
+      : null;
+    target?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
   }
 
   async function handleDecision(note: string): Promise<string | null> {
@@ -190,14 +632,17 @@ export function ReviewThreadPage({
         versionId: selectedVersion.id,
         note: note.trim() || undefined,
       });
+      ownApprovalAtRef.current = Date.now();
+      revisionRef.current += 1;
       await refreshThread();
+      void loadDiscussion(selectedVersion.id, { silent: true });
       setNotice(messages.project.decisionSaved);
       return null;
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === 'REVIEW_VERSION_STALE') {
         try {
           const loaded = await refreshThread();
-          const newest = loaded.versions[loaded.versions.length - 1];
+          const newest = loaded?.versions[loaded.versions.length - 1];
           if (newest) setSelectedVersionId(newest.id);
         } catch {
           // The stale message below is still the most useful feedback.
@@ -210,6 +655,7 @@ export function ReviewThreadPage({
   async function handleClose() {
     try {
       const closed = await closeReview(reviewId);
+      revisionRef.current += 1;
       setThread(closed);
       setNotice(messages.project.closeThreadSuccess);
       setError(null);
@@ -238,12 +684,13 @@ export function ReviewThreadPage({
         note: note.trim() || undefined,
       });
       versionCreated = true;
+      revisionRef.current += 1;
       if (uploaded) {
         const createdAsset = uploaded;
         setAssets((previous) => [createdAsset, ...previous]);
       }
       const loaded = await refreshThread();
-      const newest = loaded.versions[loaded.versions.length - 1];
+      const newest = loaded?.versions[loaded.versions.length - 1];
       if (newest) setSelectedVersionId(newest.id);
       setNotice(messages.project.versionCreated);
       return null;
@@ -262,6 +709,7 @@ export function ReviewThreadPage({
   async function handleEdit(input: UpdateReviewInput): Promise<string | null> {
     try {
       const updated = await updateReview(reviewId, input);
+      revisionRef.current += 1;
       setThread(updated);
       return null;
     } catch (cause) {
@@ -297,6 +745,10 @@ export function ReviewThreadPage({
   }
 
   const statusLabel = reviewStatusLabel(messages, summary.status);
+  // Only render the feed/pins that belong to the selected version; an old
+  // response must never flash markers from another version while switching.
+  const activeDiscussion =
+    discussion && discussion.versionId === selectedVersion?.id ? discussion : null;
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
@@ -341,7 +793,7 @@ export function ReviewThreadPage({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {isAuthor && isOpen && (
+              {isAuthor && isOpen && canWrite && (
                 <>
                   <Button
                     type="button"
@@ -366,7 +818,7 @@ export function ReviewThreadPage({
                   </Button>
                 </>
               )}
-              {canModerate && isOpen && (
+              {canModerate && isOpen && canWrite && (
                 <Button
                   type="button"
                   size="sm"
@@ -378,7 +830,7 @@ export function ReviewThreadPage({
                   {messages.project.closeThread}
                 </Button>
               )}
-              {canModerate && (
+              {canModerate && canWrite && (
                 <Button
                   type="button"
                   variant="destructive"
@@ -406,14 +858,14 @@ export function ReviewThreadPage({
               {messages.project.projectClosedNotice}
             </p>
           )}
-          {isOpen && canModerate && !allApproved && (
+          {isOpen && canModerate && canWrite && !allApproved && (
             <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
               {messages.project.closeThreadReason}{' '}
               {messages.project.closeThreadPending}{' '}
               {pendingReviewers.map((item) => item.displayName).join(', ')}
             </p>
           )}
-          {isAuthor && isOpen && photoLimitReached && (
+          {isAuthor && isOpen && canWrite && photoLimitReached && (
             <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
               {messages.project.addVersionExistingOnly}
             </p>
@@ -474,90 +926,115 @@ export function ReviewThreadPage({
             </span>
           </div>
 
-          <Card className="overflow-hidden">
-            <div className="relative flex min-h-56 items-center justify-center bg-muted/50">
-              {selectedVersion?.asset ? (
-                <img
-                  src={assetContentUrl(selectedVersion.asset.id)}
-                  alt={`${summary.title} — ${messages.project.versionLabel} ${selectedVersion.versionNumber}`}
-                  className="max-h-[70dvh] w-full object-contain"
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)] lg:items-start">
+            <div className="min-w-0 space-y-3">
+              <Card className="overflow-hidden">
+                <ReviewCanvas
+                  messages={messages}
+                  imageUrl={
+                    selectedVersion?.asset ? assetContentUrl(selectedVersion.asset.id) : null
+                  }
+                  imageAlt={`${summary.title} — ${messages.project.versionLabel} ${selectedVersion?.versionNumber ?? 0}`}
+                  pins={activeDiscussion?.pins ?? []}
+                  highlightedPinId={highlightedPinId}
+                  isClosed={!isOpen}
+                  onAddPin={setPinPoint}
+                  onHoverPin={setHoveredPinId}
+                  onSelectPin={selectPin}
                 />
-              ) : (
-                <span className="flex flex-col items-center gap-2 p-10 text-muted-foreground">
-                  <ImageIcon className="size-10" />
-                  <span className="text-xs">{messages.project.emptyPhotosDescription}</span>
-                </span>
+                <CardContent className="space-y-2 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary" className="text-[11px]">
+                      {messages.project.versionLabel} {selectedVersion?.versionNumber ?? 0}
+                    </Badge>
+                    {!isLatestSelected && (
+                      <Badge variant="outline" className="text-[11px]">
+                        {messages.project.olderVersion}
+                      </Badge>
+                    )}
+                    {selectedVersion && (
+                      <span className="text-[11px] text-muted-foreground">
+                        {messages.project.versionCreatedBy}: {selectedVersion.createdByName} ·{' '}
+                        {formatDate(selectedVersion.createdAt, locale)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-foreground">
+                    {selectedVersion?.note || messages.project.versionNoteEmpty}
+                  </p>
+                </CardContent>
+              </Card>
+
+              {isOpen && isReviewer && isLatestSelected && canWrite && (
+                <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    {messages.project.decisionDescription}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setDecision('APPROVED')}
+                      className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+                    >
+                      <Check className="size-3.5" />
+                      {messages.project.approve}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDecision('CHANGES_REQUESTED')}
+                      className="gap-1.5"
+                    >
+                      <MessageSquare className="size-3.5" />
+                      {messages.project.requestChanges}
+                    </Button>
+                  </div>
+                </div>
               )}
             </div>
-            <CardContent className="space-y-2 p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary" className="text-[11px]">
-                  {messages.project.versionLabel} {selectedVersion?.versionNumber ?? 0}
-                </Badge>
-                {!isLatestSelected && (
-                  <Badge variant="outline" className="text-[11px]">
-                    {messages.project.olderVersion}
-                  </Badge>
-                )}
-                {selectedVersion && (
-                  <span className="text-[11px] text-muted-foreground">
-                    {messages.project.versionCreatedBy}: {selectedVersion.createdByName} ·{' '}
-                    {formatDate(selectedVersion.createdAt, locale)}
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-foreground">
-                {selectedVersion?.note || messages.project.versionNoteEmpty}
-              </p>
-            </CardContent>
-          </Card>
 
-          {isOpen && isReviewer && isLatestSelected && (
-            <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs text-muted-foreground">
-                {messages.project.decisionDescription}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => setDecision('APPROVED')}
-                  className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
-                >
-                  <Check className="size-3.5" />
-                  {messages.project.approve}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDecision('CHANGES_REQUESTED')}
-                  className="gap-1.5"
-                >
-                  <MessageSquare className="size-3.5" />
-                  {messages.project.requestChanges}
-                </Button>
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section
-          aria-labelledby="discussion-placeholder-heading"
-          data-testid="discussion-placeholder"
-          className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-center"
-        >
-          <h2
-            id="discussion-placeholder-heading"
-            className="text-sm font-semibold text-foreground"
-          >
-            {messages.project.discussionPlaceholderTitle}
-          </h2>
-          <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
-            {messages.project.discussionPlaceholderDescription}
-          </p>
+            <DiscussionPanel
+              messages={messages}
+              locale={locale}
+              discussion={activeDiscussion}
+              loading={discussionLoading}
+              error={discussionErrorMessage}
+              isClosed={!isOpen}
+              currentUserId={initialUser.id}
+              canModerate={isWorkspaceAdmin}
+              highlightedPinId={highlightedPinId}
+              realtimeStatus={realtimeStatus}
+              onRetry={() => {
+                if (selectedVersion?.id) void loadDiscussion(selectedVersion.id);
+              }}
+              onRetryRealtime={() => {
+                realtimeHandleRef.current?.retry();
+                resync();
+              }}
+              onHoverPin={setHoveredPinId}
+              onSelectPin={selectPin}
+              onFocusPin={focusPin}
+              onReply={handleReply}
+              onEditComment={handleEditComment}
+              onDeleteComment={handleDeleteComment}
+              onTogglePinStatus={handleTogglePinStatus}
+              onDeletePin={handleDeletePin}
+            />
+          </div>
         </section>
       </main>
+
+      <AddPinDialog
+        open={pinPoint !== null}
+        point={pinPoint}
+        messages={messages}
+        onOpenChange={(open) => {
+          if (!open) setPinPoint(null);
+        }}
+        onSubmit={handleAddPin}
+      />
 
       <DecisionDialog
         decision={decision}
@@ -568,7 +1045,7 @@ export function ReviewThreadPage({
         onSubmit={handleDecision}
       />
 
-      {isAuthor && (
+      {isAuthor && canWrite && (
         <EditThreadDialog
           open={editOpen}
           onOpenChange={setEditOpen}

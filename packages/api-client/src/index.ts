@@ -1,4 +1,4 @@
-import type { CommentCreateInput, PinCreateInput } from '@markerit/validators';
+import type { CommentCreateInput } from '@markerit/validators';
 
 export type ApiFieldError = {
   field: string;
@@ -133,16 +133,18 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
   }
 }
 
-export function createReviewPin<TResponse>(reviewId: string, input: PinCreateInput): Promise<TResponse> {
-  return apiRequest<TResponse>(`reviews/${encodeURIComponent(reviewId)}/pins`, {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
-}
+export type CreatePinCommentInput = CommentCreateInput & {
+  /** Up to 10 project attachment ids uploaded through the attachments endpoint. */
+  attachmentAssetIds?: string[];
+};
 
-export function createPinComment<TResponse>(pinId: string, input: CommentCreateInput): Promise<TResponse> {
+export async function createPinComment<TResponse>(
+  pinId: string,
+  input: CreatePinCommentInput,
+): Promise<TResponse> {
   return apiRequest<TResponse>(`pins/${encodeURIComponent(pinId)}/comments`, {
     method: 'POST',
+    headers: await csrfHeaders(),
     body: JSON.stringify(input),
   });
 }
@@ -529,6 +531,150 @@ export async function closeReview(reviewId: string): Promise<ReviewDto> {
 
 export async function deleteReview(reviewId: string): Promise<void> {
   await apiRequest<void>(`reviews/${encodeURIComponent(reviewId)}`, {
+    method: 'DELETE',
+    headers: await csrfHeaders(),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Discussion: pins, comments and review decisions
+// ---------------------------------------------------------------------------
+
+export type PinStatus = 'OPEN' | 'RESOLVED';
+
+export type CommentDto = {
+  id: string;
+  pinId: string;
+  parentCommentId?: string | null;
+  authorId?: string | null;
+  authorName: string;
+  authorInitials: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+  editedAt?: string | null;
+  deleted: boolean;
+  attachments: AssetDto[];
+};
+
+/**
+ * A pin with its full visible comment thread. Returned by pin mutations and by
+ * the version pins endpoint.
+ */
+export type PinDto = {
+  id: string;
+  reviewVersionId: string;
+  assetId: string;
+  xPercent: number;
+  yPercent: number;
+  status: PinStatus;
+  authorId?: string | null;
+  authorName: string;
+  authorInitials: string;
+  createdAt: string;
+  resolvedBy?: string | null;
+  resolvedByName?: string | null;
+  resolvedAt?: string | null;
+  comments: CommentDto[];
+};
+
+/** A marker in the discussion payload; comments are sent in a separate list. */
+export type DiscussionPinDto = Omit<PinDto, 'reviewVersionId' | 'comments'> & {
+  commentCount: number;
+};
+
+/** An approval decision rendered as a review item in the discussion feed. */
+export type DiscussionReviewDto = {
+  id: string;
+  reviewId: string;
+  versionId: string;
+  kind: 'REVIEW';
+  decision: ReviewDecision;
+  note?: string | null;
+  authorId?: string | null;
+  authorName: string;
+  authorInitials: string;
+  createdAt: string;
+};
+
+export type DiscussionDto = {
+  reviewId: string;
+  versionId: string;
+  pins: DiscussionPinDto[];
+  comments: CommentDto[];
+  reviews: DiscussionReviewDto[];
+};
+
+export type CreatePinInput = {
+  xPercent: number;
+  yPercent: number;
+  body: string;
+  attachmentAssetIds?: string[];
+};
+
+export type UpdatePinInput = {
+  status: PinStatus;
+};
+
+export type UpdateCommentInput = {
+  body: string;
+};
+
+export function getReviewDiscussion(reviewId: string, versionId: string): Promise<DiscussionDto> {
+  return apiRequest<DiscussionDto>(
+    `reviews/${encodeURIComponent(reviewId)}/versions/${encodeURIComponent(versionId)}/discussion`,
+  );
+}
+
+export function listReviewPins(reviewId: string, versionId: string): Promise<PinDto[]> {
+  return apiRequest<PinDto[]>(
+    `reviews/${encodeURIComponent(reviewId)}/versions/${encodeURIComponent(versionId)}/pins`,
+  );
+}
+
+export async function createVersionPin(
+  reviewId: string,
+  versionId: string,
+  input: CreatePinInput,
+): Promise<PinDto> {
+  return apiRequest<PinDto>(
+    `reviews/${encodeURIComponent(reviewId)}/versions/${encodeURIComponent(versionId)}/pins`,
+    {
+      method: 'POST',
+      headers: await csrfHeaders(),
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function updatePin(pinId: string, input: UpdatePinInput): Promise<PinDto> {
+  return apiRequest<PinDto>(`pins/${encodeURIComponent(pinId)}`, {
+    method: 'PATCH',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deletePin(pinId: string): Promise<void> {
+  await apiRequest<void>(`pins/${encodeURIComponent(pinId)}`, {
+    method: 'DELETE',
+    headers: await csrfHeaders(),
+  });
+}
+
+export async function updateComment(
+  commentId: string,
+  input: UpdateCommentInput,
+): Promise<CommentDto> {
+  return apiRequest<CommentDto>(`comments/${encodeURIComponent(commentId)}`, {
+    method: 'PATCH',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteComment(commentId: string): Promise<void> {
+  await apiRequest<void>(`comments/${encodeURIComponent(commentId)}`, {
     method: 'DELETE',
     headers: await csrfHeaders(),
   });
