@@ -78,4 +78,8 @@ public class WorkspaceMember {
     public boolean canCreateProjects() {
         return "OWNER".equals(role) || "ADMIN".equals(role) || "MEMBER".equals(role);
     }
+
+    public boolean canWriteReviews() {
+        return canCreateProjects();
+    }
 }

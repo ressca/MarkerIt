@@ -13,7 +13,8 @@
 - Zamiast natywnych enumów PostgreSQL używamy `VARCHAR` + `CHECK`, żeby dodawanie
   wartości nie wymagało migracji typu.
 - Soft delete (`deleted_at`) dla encji biznesowych: użytkownik, workspace, projekt,
-  review, asset, pin, komentarz. Twarde usuwanie tylko przez zadania retencji.
+  asset, pin, komentarz. Wątki recenzji (`reviews`) są usuwane twardo wraz z
+  kaskadowymi powiązaniami. Twarde usuwanie pozostałych encji tylko przez zadania retencji.
 - Tokeny (zaproszenia, linki share, API keys) przechowywane wyłącznie jako hash.
 - Liczniki (liczba uwag, projektów itd.) **nie są** duplikowane w kolumnach —
   liczymy je zapytaniem/widokiem, dopóki wydajność nie wymusi tabeli agregatów.
@@ -357,9 +358,11 @@ Review = kontener na jedną rzecz do oceny (np. makieta, plakat, ekran) wraz z w
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT now()` |
 | `updated_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT now()` |
 | `closed_at` | `TIMESTAMPTZ` |  |
-| `deleted_at` | `TIMESTAMPTZ` |  |
+| `deleted_at` | `TIMESTAMPTZ` | kolumna historyczna; wątki recenzji są usuwane twardo |
 
 - Indeksy: `(project_id, status)`, `(project_id, updated_at DESC)`.
+- Usunięcie wątku jest twarde: kaskadowo znikają wersje, pinezki, komentarze,
+  decyzje i przypisania recenzentów.
 
 #### `review_versions`
 
@@ -433,9 +436,12 @@ Review = kontener na jedną rzecz do oceny (np. makieta, plakat, ekran) wraz z w
 
 #### `review_approvals` (etap 2+)
 
-- `id`, `review_id`, `user_id`, `decision` (`APPROVED` / `CHANGES_REQUESTED`),
-  `note`, `created_at`.
-- Historia decyzji (bez unikatu); aktualna = najnowsza.
+- `id`, `review_id`, `review_version_id`, `user_id`, `decision`
+  (`APPROVED` / `CHANGES_REQUESTED`), `note`, `created_at`.
+- Decyzja dotyczy konkretnej wersji. Nowa wersja wymaga ponownych decyzji
+  aktualnie przypisanych recenzentów.
+- Historia decyzji (bez unikatu); aktualna = najnowsza dla najnowszej wersji,
+  utworzona po dodaniu bieżącego przypisania recenzenta.
 
 #### `tags`, `project_tags` (etap 2+, opcjonalne)
 
@@ -589,6 +595,8 @@ Wszystkie tabele powstają od razu (wariant „od razu”):
 | `V6__collaboration_notifications.sql` | `workspace_invitations`, `project_invitations`, `share_links`, `share_link_sessions`, `notifications`, `notification_preferences`, `email_outbox`, `activity_events`, `audit_events` |
 | `V7__review_image_storage_limit.sql` | `assets.project_id`, limit 8 zdjęć na projekt, walidacja przynależności assetu do projektu |
 | `V8__allow_s3_storage_provider.sql` | `storage_provider` dopuszcza `S3` (MinIO i inne magazyny zgodne z S3) obok `R2` i `LOCAL` |
+| `V9__review_thread_reviewers.sql` | `review_reviewers`, `reviews.closed_by` |
+| `V10__review_approvals_version.sql` | `review_approvals.review_version_id`, backfill do najnowszej wersji i indeks wersjonowanych decyzji |
 
 Billing i integracje (API keys, webhooks) są świadomie pominięte.
 
