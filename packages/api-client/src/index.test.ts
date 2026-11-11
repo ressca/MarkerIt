@@ -2,20 +2,34 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
   apiRequest,
+  closeReview,
   createPinComment,
   createProject,
+  createReview,
   createReviewPin,
+  createReviewVersion,
   createWorkspace,
   deleteProject,
+  deleteProjectAsset,
+  deleteReview,
   deleteWorkspace,
+  getProject,
+  getReview,
   getWorkspace,
+  listProjectAssets,
+  listProjectReviews,
   listProjects,
+  listWorkspaceMembers,
   listWorkspaces,
   loginAccount,
   registerAccount,
   resendVerification,
+  submitReviewApproval,
   updateProject,
+  updateReview,
   updateWorkspace,
+  uploadProjectAsset,
+  uploadProjectAttachment,
   verifyEmail,
 } from './index';
 
@@ -176,6 +190,141 @@ describe('dashboard API operations', () => {
     expect(fetchMock.mock.calls[5][1].method).toBe('DELETE');
     expect(JSON.parse(fetchMock.mock.calls[7][1].body)).toEqual({ name: 'Projekt', tone: 'sage' });
     expect(JSON.parse(fetchMock.mock.calls[9][1].body)).toEqual({ status: 'CLOSED' });
+    expect(fetchMock.mock.calls.every((call, index) => index % 2 === 1 || call[0].includes('/auth/csrf'))).toBe(true);
+  });
+});
+
+describe('project review API operations', () => {
+  const csrf = () => json({ token: 'csrf-token' });
+  const project = {
+    id: 'p-1',
+    workspaceId: 'ws-1',
+    name: 'Projekt',
+    description: null,
+    status: 'ACTIVE',
+    tone: 'sage',
+    createdBy: 'u-1',
+    createdByName: 'Anna',
+    createdAt: '2026-11-11T10:00:00Z',
+    updatedAt: '2026-11-11T10:00:00Z',
+    openComments: 0,
+    members: [],
+  };
+
+  it('reads a project, its assets, members and review summaries', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json(project))
+      .mockResolvedValueOnce(json([{ id: 'asset-1' }]))
+      .mockResolvedValueOnce(json([{ id: 'member-1' }]))
+      .mockResolvedValueOnce(json([{ id: 'review-1' }]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(getProject('p/1')).resolves.toEqual(project);
+    await expect(listProjectAssets('p 1')).resolves.toEqual([{ id: 'asset-1' }]);
+    await expect(listWorkspaceMembers('ws/1')).resolves.toEqual([{ id: 'member-1' }]);
+    await expect(listProjectReviews('p-1')).resolves.toEqual([{ id: 'review-1' }]);
+
+    expect(fetchMock.mock.calls[0][0]).toContain('/projects/p%2F1');
+    expect(fetchMock.mock.calls[0][1].method).toBeUndefined();
+    expect(fetchMock.mock.calls[1][0]).toContain('/projects/p%201/assets');
+    expect(fetchMock.mock.calls[2][0]).toContain('/workspaces/ws%2F1/members');
+    expect(fetchMock.mock.calls[3][0]).toContain('/projects/p-1/reviews');
+  });
+
+  it('uploads review images and attachments as CSRF-protected multipart', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json({ id: 'asset-1', url: 'assets/asset-1/content' }, 201))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json({ id: 'asset-2', url: 'assets/asset-2/content' }, 201));
+    vi.stubGlobal('fetch', fetchMock);
+    const file = new File(['png'], 'shot.png', { type: 'image/png' });
+
+    await expect(uploadProjectAsset('p-1', file)).resolves.toMatchObject({ id: 'asset-1' });
+    await expect(uploadProjectAttachment('p-1', file)).resolves.toMatchObject({ id: 'asset-2' });
+
+    const [, uploadInit] = fetchMock.mock.calls[1];
+    expect(fetchMock.mock.calls[1][0]).toContain('/projects/p-1/assets');
+    expect(uploadInit.headers.get('X-XSRF-TOKEN')).toBe('csrf-token');
+    expect(uploadInit.headers.has('Content-Type')).toBe(false);
+    expect(uploadInit.body).toBeInstanceOf(FormData);
+    expect((uploadInit.body as FormData).get('file')).toBe(file);
+    expect(fetchMock.mock.calls[3][0]).toContain('/projects/p-1/attachments');
+  });
+
+  it('deletes an unreferenced project asset with CSRF', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(deleteProjectAsset('asset/1')).resolves.toBeUndefined();
+    expect(fetchMock.mock.calls[1][0]).toContain('/assets/asset%2F1');
+    expect(fetchMock.mock.calls[1][1].method).toBe('DELETE');
+    expect(fetchMock.mock.calls[1][1].headers.get('X-XSRF-TOKEN')).toBe('csrf-token');
+  });
+
+  it('creates, reads and updates review threads with CSRF', async () => {
+    const review = { summary: { id: 'r-1', title: 'Wątek' }, reviewers: [], versions: [], approvals: [] };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json(review, 201))
+      .mockResolvedValueOnce(json(review))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json({ ...review, summary: { ...review.summary, title: 'Nowy' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const input = {
+      title: 'Wątek',
+      description: 'Opis',
+      assetId: 'asset-1',
+      reviewerIds: ['u-2'],
+    };
+    await expect(createReview('p-1', input)).resolves.toEqual(review);
+    await expect(getReview('r/1')).resolves.toEqual(review);
+    await expect(updateReview('r-1', { title: 'Nowy', reviewerIds: [] })).resolves.toMatchObject({
+      summary: { title: 'Nowy' },
+    });
+
+    expect(fetchMock.mock.calls[1][0]).toContain('/projects/p-1/reviews');
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual(input);
+    expect(fetchMock.mock.calls[2][0]).toContain('/reviews/r%2F1');
+    expect(fetchMock.mock.calls[4][1].method).toBe('PATCH');
+    expect(fetchMock.mock.calls[4][1].headers.get('X-XSRF-TOKEN')).toBe('csrf-token');
+    expect(JSON.parse(fetchMock.mock.calls[4][1].body)).toEqual({ title: 'Nowy', reviewerIds: [] });
+  });
+
+  it('adds versions, submits decisions, closes and deletes threads', async () => {
+    const version = { id: 'v-2', versionNumber: 2, createdAt: 'now', createdByName: 'Anna' };
+    const approval = { userId: 'u-2', decision: 'APPROVED', versionId: 'v-2' };
+    const review = { summary: { id: 'r-1' }, reviewers: [], versions: [version], approvals: [approval] };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json(version, 201))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json(approval, 201))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json(review))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createReviewVersion('r-1', { assetId: 'asset-2', note: 'Poprawki' });
+    await submitReviewApproval('r-1', { decision: 'APPROVED', versionId: 'v-2', note: 'OK' });
+    await closeReview('r-1');
+    await deleteReview('r-1');
+
+    expect(fetchMock.mock.calls[1][0]).toContain('/reviews/r-1/versions');
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ assetId: 'asset-2', note: 'Poprawki' });
+    expect(fetchMock.mock.calls[3][0]).toContain('/reviews/r-1/approvals');
+    expect(JSON.parse(fetchMock.mock.calls[3][1].body)).toEqual({
+      decision: 'APPROVED',
+      versionId: 'v-2',
+      note: 'OK',
+    });
+    expect(fetchMock.mock.calls[5][0]).toContain('/reviews/r-1/close');
+    expect(fetchMock.mock.calls[5][1].method).toBe('POST');
+    expect(fetchMock.mock.calls[7][1].method).toBe('DELETE');
     expect(fetchMock.mock.calls.every((call, index) => index % 2 === 1 || call[0].includes('/auth/csrf'))).toBe(true);
   });
 });

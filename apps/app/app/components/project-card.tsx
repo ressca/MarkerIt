@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@markerit/ui/components/card';
 import { Badge } from '@markerit/ui/components/badge';
 import { Button } from '@markerit/ui/components/button';
@@ -55,7 +56,9 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
       className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-primary/40"
     >
       {/* Top Banner / Preview Thumbnail */}
-      <div
+      <Link
+        href={`/projects/${project.id}`}
+        aria-label={project.name}
         className={cn(
           'relative flex h-32 w-full items-center justify-center overflow-hidden bg-gradient-to-br p-4 transition-transform group-hover:scale-[1.01]',
           gradient
@@ -103,7 +106,7 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
             {project.status}
           </Badge>
         </div>
-      </div>
+      </Link>
 
       {/* Card Content */}
       <CardContent className="flex flex-1 flex-col justify-between p-4">
@@ -111,7 +114,9 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
           <div className="flex items-start justify-between gap-2">
             <div>
               <h3 className="font-semibold text-base tracking-tight text-foreground group-hover:text-primary transition-colors">
-                {project.name}
+                <Link href={`/projects/${project.id}`} className="hover:underline">
+                  {project.name}
+                </Link>
               </h3>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {project.description || 'Brak opisu'}

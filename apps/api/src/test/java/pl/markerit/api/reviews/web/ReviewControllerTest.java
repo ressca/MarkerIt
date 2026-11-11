@@ -59,7 +59,8 @@ class ReviewControllerTest {
         ReviewApprovalResponse approval = new ReviewApprovalResponse(
                 userId, "Anna", UUID.randomUUID(), "APPROVED", "ok", Instant.now());
         CreateVersionRequest versionRequest = new CreateVersionRequest(assetId, "nota");
-        SubmitApprovalRequest approvalRequest = new SubmitApprovalRequest("APPROVED", "ok");
+        SubmitApprovalRequest approvalRequest = new SubmitApprovalRequest(
+                "APPROVED", UUID.randomUUID(), "ok");
         when(reviews.addVersion(userId, reviewId, versionRequest)).thenReturn(version);
         when(reviews.submitApproval(userId, reviewId, approvalRequest)).thenReturn(approval);
 
@@ -92,6 +93,7 @@ class ReviewControllerTest {
                 null,
                 null,
                 null,
+                List.of(),
                 0,
                 new ReviewApprovalSummaryResponse(0, 0, 0, 0));
     }

@@ -342,7 +342,7 @@ class ReviewServiceTest {
                         new CreateVersionRequest(UUID.randomUUID(), null)));
         ConflictException approval = assertThrows(ConflictException.class,
                 () -> service.submitApproval(userId, review.getId(),
-                        new SubmitApprovalRequest("APPROVED", null)));
+                        new SubmitApprovalRequest("APPROVED", UUID.randomUUID(), null)));
         ConflictException close = assertThrows(ConflictException.class,
                 () -> service.close(userId, review.getId()));
 
@@ -370,7 +370,7 @@ class ReviewServiceTest {
                         new UpdateReviewRequest("Tytuł", null, null)));
         ForbiddenAccessException approval = assertThrows(ForbiddenAccessException.class,
                 () -> service.submitApproval(userId, review.getId(),
-                        new SubmitApprovalRequest("APPROVED", null)));
+                        new SubmitApprovalRequest("APPROVED", UUID.randomUUID(), null)));
         ForbiddenAccessException close = assertThrows(ForbiddenAccessException.class,
                 () -> service.close(userId, review.getId()));
         ForbiddenAccessException delete = assertThrows(ForbiddenAccessException.class,
@@ -450,7 +450,7 @@ class ReviewServiceTest {
 
         ForbiddenAccessException exception = assertThrows(ForbiddenAccessException.class,
                 () -> service.submitApproval(userId, review.getId(),
-                        new SubmitApprovalRequest("APPROVED", null)));
+                        new SubmitApprovalRequest("APPROVED", UUID.randomUUID(), null)));
 
         assertEquals("REVIEW_FORBIDDEN", exception.getCode());
     }
@@ -465,7 +465,7 @@ class ReviewServiceTest {
                 new ReviewReviewer(review.getId(), otherUserId, userId)));
 
         var response = service.submitApproval(otherUserId, review.getId(),
-                new SubmitApprovalRequest(" approved ", "  wygląda dobrze "));
+                new SubmitApprovalRequest(" approved ", version.getId(), "  wygląda dobrze "));
 
         assertEquals(otherUserId, response.userId());
         assertEquals(version.getId(), response.versionId());
@@ -485,9 +485,26 @@ class ReviewServiceTest {
 
         ConflictException exception = assertThrows(ConflictException.class,
                 () -> service.submitApproval(otherUserId, review.getId(),
-                        new SubmitApprovalRequest("APPROVED", null)));
+                        new SubmitApprovalRequest("APPROVED", UUID.randomUUID(), null)));
 
         assertEquals("REVIEW_VERSION_MISSING", exception.getCode());
+    }
+
+    @Test void rejectsApprovalForStaleVersion() {
+        Review review = review(userId);
+        ReviewVersion latest = new ReviewVersion(review.getId(), 2, null, userId);
+        when(reviews.findByIdForUpdate(review.getId())).thenReturn(Optional.of(review));
+        when(versions.findFirstByReviewIdOrderByVersionNumberDesc(review.getId()))
+                .thenReturn(Optional.of(latest));
+        when(reviewers.findForReview(review.getId())).thenReturn(List.of(
+                new ReviewReviewer(review.getId(), otherUserId, userId)));
+
+        ConflictException exception = assertThrows(ConflictException.class,
+                () -> service.submitApproval(otherUserId, review.getId(),
+                        new SubmitApprovalRequest("APPROVED", UUID.randomUUID(), null)));
+
+        assertEquals("REVIEW_VERSION_STALE", exception.getCode());
+        verify(approvals, never()).save(any());
     }
 
     @Test void rejectsUnknownDecision() {
@@ -501,7 +518,7 @@ class ReviewServiceTest {
 
         InvalidRequestException exception = assertThrows(InvalidRequestException.class,
                 () -> service.submitApproval(otherUserId, review.getId(),
-                        new SubmitApprovalRequest("MAYBE", null)));
+                        new SubmitApprovalRequest("MAYBE", version.getId(), null)));
 
         assertEquals("INVALID_DECISION", exception.getCode());
     }
@@ -516,7 +533,7 @@ class ReviewServiceTest {
                 new ReviewReviewer(review.getId(), otherUserId, userId)));
 
         var approval = service.submitApproval(otherUserId, review.getId(),
-                new SubmitApprovalRequest("APPROVED", null));
+                new SubmitApprovalRequest("APPROVED", version1.getId(), null));
 
         assertEquals(version1.getId(), approval.versionId());
 

@@ -73,7 +73,10 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
   const { baseUrl = defaultBaseUrl, headers: requestHeaders, ...init } = options;
   const headers = new Headers(requestHeaders);
   headers.set('Accept', 'application/json, application/problem+json');
-  if (init.body !== undefined && !headers.has('Content-Type')) {
+  // FormData must keep the browser-generated multipart boundary, so the
+  // generic JSON content type must not be applied to it.
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
+  if (init.body !== undefined && !isFormData && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -307,6 +310,225 @@ export async function updateProject(
 
 export async function deleteProject(projectId: string): Promise<void> {
   await apiRequest<void>(`projects/${encodeURIComponent(projectId)}`, {
+    method: 'DELETE',
+    headers: await csrfHeaders(),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Project detail: members, review images and review threads
+// ---------------------------------------------------------------------------
+
+export type WorkspaceMemberDto = {
+  id: string;
+  displayName: string;
+  email: string;
+  initials: string;
+  role: WorkspaceRole;
+};
+
+export type AssetDto = {
+  id: string;
+  projectId: string;
+  purpose: string;
+  contentType: string;
+  originalName: string;
+  sizeBytes: number;
+  width?: number | null;
+  height?: number | null;
+  /** Content path relative to the API base URL. */
+  url: string;
+  createdAt: string;
+};
+
+export type ReviewStatus = 'OPEN' | 'CLOSED';
+export type ReviewDecision = 'APPROVED' | 'CHANGES_REQUESTED';
+
+export type ReviewVersionDto = {
+  id: string;
+  versionNumber: number;
+  note?: string | null;
+  asset?: AssetDto | null;
+  createdAt: string;
+  createdByName: string;
+};
+
+export type ReviewReviewerDto = {
+  userId: string;
+  displayName: string;
+  initials: string;
+  decision?: ReviewDecision | null;
+  decisionNote?: string | null;
+  decidedAt?: string | null;
+};
+
+export type ReviewApprovalDto = {
+  userId: string;
+  displayName: string;
+  versionId: string;
+  decision: ReviewDecision;
+  note?: string | null;
+  createdAt: string;
+};
+
+export type ReviewApprovalSummaryDto = {
+  approved: number;
+  changesRequested: number;
+  pending: number;
+  total: number;
+};
+
+export type ReviewSummaryDto = {
+  id: string;
+  projectId: string;
+  title: string;
+  description?: string | null;
+  status: ReviewStatus;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt?: string | null;
+  closedBy?: string | null;
+  closedByName?: string | null;
+  latestVersion?: ReviewVersionDto | null;
+  /** Reviewer preview included in the list response, so cards avoid a detail request. */
+  reviewers?: ReviewReviewerDto[];
+  reviewerCount: number;
+  approvalSummary: ReviewApprovalSummaryDto;
+};
+
+export type ReviewDto = {
+  summary: ReviewSummaryDto;
+  reviewers: ReviewReviewerDto[];
+  versions: ReviewVersionDto[];
+  approvals: ReviewApprovalDto[];
+};
+
+export type CreateReviewInput = {
+  title: string;
+  description?: string;
+  assetId: string;
+  reviewerIds?: string[];
+};
+
+export type UpdateReviewInput = {
+  title?: string;
+  description?: string;
+  reviewerIds?: string[];
+};
+
+export type CreateReviewVersionInput = {
+  assetId: string;
+  note?: string;
+};
+
+export type SubmitReviewApprovalInput = {
+  decision: ReviewDecision;
+  /** Version the decision applies to; stale versions are rejected by the API. */
+  versionId: string;
+  note?: string;
+};
+
+export function getProject(projectId: string): Promise<ProjectDto> {
+  return apiRequest<ProjectDto>(`projects/${encodeURIComponent(projectId)}`);
+}
+
+export function listProjectAssets(projectId: string): Promise<AssetDto[]> {
+  return apiRequest<AssetDto[]>(`projects/${encodeURIComponent(projectId)}/assets`);
+}
+
+async function uploadFile(path: string, file: File): Promise<AssetDto> {
+  const body = new FormData();
+  body.append('file', file);
+  return apiRequest<AssetDto>(path, {
+    method: 'POST',
+    // Do not set Content-Type: the browser must add the multipart boundary.
+    headers: await csrfHeaders(),
+    body,
+  });
+}
+
+export function uploadProjectAsset(projectId: string, file: File): Promise<AssetDto> {
+  return uploadFile(`projects/${encodeURIComponent(projectId)}/assets`, file);
+}
+
+export function uploadProjectAttachment(projectId: string, file: File): Promise<AssetDto> {
+  return uploadFile(`projects/${encodeURIComponent(projectId)}/attachments`, file);
+}
+
+export async function deleteProjectAsset(assetId: string): Promise<void> {
+  await apiRequest<void>(`assets/${encodeURIComponent(assetId)}`, {
+    method: 'DELETE',
+    headers: await csrfHeaders(),
+  });
+}
+
+export function listWorkspaceMembers(workspaceId: string): Promise<WorkspaceMemberDto[]> {
+  return apiRequest<WorkspaceMemberDto[]>(`workspaces/${encodeURIComponent(workspaceId)}/members`);
+}
+
+export function listProjectReviews(projectId: string): Promise<ReviewSummaryDto[]> {
+  return apiRequest<ReviewSummaryDto[]>(`projects/${encodeURIComponent(projectId)}/reviews`);
+}
+
+export async function createReview(
+  projectId: string,
+  input: CreateReviewInput,
+): Promise<ReviewDto> {
+  return apiRequest<ReviewDto>(`projects/${encodeURIComponent(projectId)}/reviews`, {
+    method: 'POST',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export function getReview(reviewId: string): Promise<ReviewDto> {
+  return apiRequest<ReviewDto>(`reviews/${encodeURIComponent(reviewId)}`);
+}
+
+export async function updateReview(
+  reviewId: string,
+  input: UpdateReviewInput,
+): Promise<ReviewDto> {
+  return apiRequest<ReviewDto>(`reviews/${encodeURIComponent(reviewId)}`, {
+    method: 'PATCH',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export async function createReviewVersion(
+  reviewId: string,
+  input: CreateReviewVersionInput,
+): Promise<ReviewVersionDto> {
+  return apiRequest<ReviewVersionDto>(`reviews/${encodeURIComponent(reviewId)}/versions`, {
+    method: 'POST',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export async function submitReviewApproval(
+  reviewId: string,
+  input: SubmitReviewApprovalInput,
+): Promise<ReviewApprovalDto> {
+  return apiRequest<ReviewApprovalDto>(`reviews/${encodeURIComponent(reviewId)}/approvals`, {
+    method: 'POST',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export async function closeReview(reviewId: string): Promise<ReviewDto> {
+  return apiRequest<ReviewDto>(`reviews/${encodeURIComponent(reviewId)}/close`, {
+    method: 'POST',
+    headers: await csrfHeaders(),
+  });
+}
+
+export async function deleteReview(reviewId: string): Promise<void> {
+  await apiRequest<void>(`reviews/${encodeURIComponent(reviewId)}`, {
     method: 'DELETE',
     headers: await csrfHeaders(),
   });

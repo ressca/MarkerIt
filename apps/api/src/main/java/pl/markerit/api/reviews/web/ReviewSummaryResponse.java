@@ -1,6 +1,7 @@
 package pl.markerit.api.reviews.web;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public record ReviewSummaryResponse(
@@ -17,6 +18,7 @@ public record ReviewSummaryResponse(
         UUID closedBy,
         String closedByName,
         ReviewVersionResponse latestVersion,
+        List<ReviewReviewerResponse> reviewers,
         int reviewerCount,
         ReviewApprovalSummaryResponse approvalSummary) {
 }

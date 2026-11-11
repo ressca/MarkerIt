@@ -40,6 +40,15 @@ class ProjectControllerTest {
         assertEquals(response, controller.create(jwt, workspaceId, createRequest));
     }
 
+    @Test void readsSingleProject() {
+        var response = new ProjectResponse(projectId, workspaceId, "Projekt", "Opis", "ACTIVE", "sage",
+                userId, "Anna", Instant.now(), Instant.now(), 0, List.of());
+        when(projects.get(userId, projectId)).thenReturn(response);
+
+        assertEquals(response, controller.get(jwt, projectId));
+        verify(projects).get(userId, projectId);
+    }
+
     @Test void updatesAndDeletesProject() {
         var response = new ProjectResponse(projectId, workspaceId, "Projekt", null, "CLOSED", "sage",
                 userId, "Anna", Instant.now(), Instant.now(), 0, List.of());

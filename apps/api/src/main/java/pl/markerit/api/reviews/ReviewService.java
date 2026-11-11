@@ -223,6 +223,11 @@ public class ReviewService {
         requireOpen(review);
 
         ReviewVersion version = requireLatestVersion(reviewId);
+        if (request.versionId() == null || !version.getId().equals(request.versionId())) {
+            throw new ConflictException(
+                    "REVIEW_VERSION_STALE",
+                    "Wątek ma nowszą wersję. Odśwież stronę i oceń najnowszą wersję.");
+        }
 
         String decision = request.decision() == null
                 ? ""
@@ -554,6 +559,11 @@ public class ReviewService {
                 .map(this::toVersionResponse)
                 .orElse(null);
 
+        List<ReviewReviewerResponse> reviewerResponses = assigned.stream()
+                .map(assignment -> toReviewerResponse(
+                        assignment, effectiveApproval(assignment, latest)))
+                .toList();
+
         return new ReviewSummaryResponse(
                 review.getId(),
                 review.getProjectId(),
@@ -568,7 +578,8 @@ public class ReviewService {
                 review.getClosedBy(),
                 review.getClosedBy() == null ? null : displayName(review.getClosedBy()),
                 latestVersion,
-                assigned.size(),
+                reviewerResponses,
+                reviewerResponses.size(),
                 approvalSummary(assigned, latest));
     }
 
@@ -576,14 +587,11 @@ public class ReviewService {
         List<ReviewReviewer> assigned = reviewers.findForReview(review.getId());
         Map<UUID, ReviewApproval> latest = latestApprovals(review.getId());
 
+        ReviewSummaryResponse summary = toSummary(review, assigned, latest);
+
         List<ReviewVersionResponse> versionResponses = versions
                 .findByReviewIdOrderByVersionNumberAsc(review.getId()).stream()
                 .map(this::toVersionResponse)
-                .toList();
-
-        List<ReviewReviewerResponse> reviewerResponses = assigned.stream()
-                .map(assignment -> toReviewerResponse(
-                        assignment, effectiveApproval(assignment, latest)))
                 .toList();
 
         List<ReviewApprovalResponse> approvalResponses = latest.values().stream()
@@ -593,8 +601,8 @@ public class ReviewService {
                 .toList();
 
         return new ReviewResponse(
-                toSummary(review, assigned, latest),
-                reviewerResponses,
+                summary,
+                summary.reviewers(),
                 versionResponses,
                 approvalResponses);
     }

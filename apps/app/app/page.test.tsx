@@ -112,6 +112,14 @@ describe('DashboardView', () => {
     expect(membersCard).not.toHaveTextContent('2');
   });
 
+  it('links project cards to the project detail page', () => {
+    renderDashboard();
+
+    const links = screen.getAllByRole('link', { name: 'Kampania — wiosna' });
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0]).toHaveAttribute('href', '/projects/proj-1');
+  });
+
   it('shows namespace usage limits without metric badges', () => {
     renderDashboard();
 
@@ -191,6 +199,10 @@ describe('DashboardView', () => {
 
     expect(container.querySelector('.project-list')).toBeInTheDocument();
     expect(container.querySelector('.project-grid')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Kampania — wiosna' })[0]).toHaveAttribute(
+      'href',
+      '/projects/proj-1',
+    );
   });
 
   it('collapses and expands the full-height sidebar', async () => {

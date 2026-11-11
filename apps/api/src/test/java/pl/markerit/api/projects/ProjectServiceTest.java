@@ -57,6 +57,46 @@ class ProjectServiceTest {
         assertEquals(0, response.get(0).openComments());
     }
 
+    @Test void readsProjectForWorkspaceMember() {
+        User creator = mock(User.class);
+        when(creator.getId()).thenReturn(userId);
+        when(creator.getDisplayName()).thenReturn("Anna Kowalska");
+        Project project = new Project(workspaceId, "Makieta", "makieta", "Opis", "sage", userId);
+
+        when(projects.findByIdAndDeletedAtIsNull(project.getId())).thenReturn(Optional.of(project));
+        when(workspaces.requireMember(workspaceId, userId))
+                .thenReturn(new WorkspaceMember(workspaceId, userId, "MEMBER", userId));
+        when(users.findById(userId)).thenReturn(Optional.of(creator));
+
+        var response = service.get(userId, project.getId());
+
+        assertEquals(project.getId(), response.id());
+        assertEquals("Makieta", response.name());
+        assertEquals("Opis", response.description());
+        verify(workspaces).requireMember(workspaceId, userId);
+    }
+
+    @Test void getRejectsMissingProject() {
+        UUID projectId = UUID.randomUUID();
+        when(projects.findByIdAndDeletedAtIsNull(projectId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.get(userId, projectId));
+        verify(workspaces, never()).requireMember(any(), any());
+    }
+
+    @Test void getRejectsNonWorkspaceMember() {
+        Project project = new Project(workspaceId, "Makieta", "makieta", null, "sage", userId);
+        when(projects.findByIdAndDeletedAtIsNull(project.getId())).thenReturn(Optional.of(project));
+        when(workspaces.requireMember(workspaceId, userId))
+                .thenThrow(new ForbiddenAccessException("WORKSPACE_FORBIDDEN", "Brak dostępu."));
+
+        ForbiddenAccessException exception = assertThrows(ForbiddenAccessException.class,
+                () -> service.get(userId, project.getId()));
+
+        assertEquals("WORKSPACE_FORBIDDEN", exception.getCode());
+        verify(users, never()).findById(any());
+    }
+
     @Test void rejectsFourthProject() {
         when(workspaces.requireProjectManager(workspaceId, userId))
                 .thenReturn(new WorkspaceMember(workspaceId, userId, "OWNER", userId));

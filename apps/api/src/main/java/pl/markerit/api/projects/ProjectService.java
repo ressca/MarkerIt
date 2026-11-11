@@ -46,6 +46,13 @@ public class ProjectService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public ProjectResponse get(UUID userId, UUID projectId) {
+        Project project = requireProject(projectId);
+        workspaces.requireMember(project.getWorkspaceId(), userId);
+        return toResponse(project);
+    }
+
     @Transactional
     public ProjectResponse create(UUID userId, UUID workspaceId, CreateProjectRequest request) {
         workspaces.requireProjectManager(workspaceId, userId);

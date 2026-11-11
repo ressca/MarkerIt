@@ -28,6 +28,8 @@ export {
   AvatarBadge,
 } from './components/avatar';
 export { Input } from './components/input';
+export { Checkbox } from './components/checkbox';
+export { Textarea } from './components/textarea';
 export { Label } from './components/label';
 export {
   Dialog,

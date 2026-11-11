@@ -69,10 +69,23 @@ class ReviewControllerMockMvcTest {
         mockMvc.perform(post("/api/v1/reviews/{reviewId}/approvals", reviewId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"decision":"APPROVED"}
-                                """))
+                                {"decision":"APPROVED","versionId":"%s"}
+                                """.formatted(UUID.randomUUID())))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("REVIEW_FORBIDDEN"));
+    }
+
+    @Test void returns409WhenApprovalVersionIsStale() throws Exception {
+        when(reviews.submitApproval(eq(userId), eq(reviewId), any(SubmitApprovalRequest.class)))
+                .thenThrow(new ConflictException("REVIEW_VERSION_STALE", "Nowa wersja."));
+
+        mockMvc.perform(post("/api/v1/reviews/{reviewId}/approvals", reviewId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"decision":"APPROVED","versionId":"%s"}
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REVIEW_VERSION_STALE"));
     }
 
     @Test void approvalResponseIncludesVersionId() throws Exception {
@@ -84,8 +97,8 @@ class ReviewControllerMockMvcTest {
         mockMvc.perform(post("/api/v1/reviews/{reviewId}/approvals", reviewId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"decision":"APPROVED"}
-                                """))
+                                {"decision":"APPROVED","versionId":"%s"}
+                                """.formatted(versionId)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.versionId").value(versionId.toString()));
     }
@@ -146,6 +159,7 @@ class ReviewControllerMockMvcTest {
                 null,
                 null,
                 null,
+                List.of(),
                 0,
                 new ReviewApprovalSummaryResponse(0, 0, 0, 0));
         return new ReviewResponse(summary, List.of(), List.of(), List.of());

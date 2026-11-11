@@ -10,6 +10,18 @@ describe('localization', () => {
     expect(getMessages('pl').process.steps).toHaveLength(3);
   });
 
+  it('provides project and review-thread copy in both languages', () => {
+    expect(getMessages('en').project.newThread).toBe('New thread');
+    expect(getMessages('pl').project.newThread).toBe('Nowy wątek');
+    expect(getMessages('en').project.photosInProject).toBe('photos in this project');
+    expect(getMessages('pl').project.photosInProject).toBe('zdjęć w projekcie');
+    expect(getMessages('en').project.discussionPlaceholderTitle).toBeTruthy();
+    expect(getMessages('pl').project.discussionPlaceholderDescription).toBeTruthy();
+    expect(getMessages('en').project.staleVersionError).toContain('new version');
+    expect(getMessages('pl').project.reviewerLimitHint).toContain('20');
+    expect(getMessages('en').project.projectClosedError).toBeTruthy();
+  });
+
   it('recognizes supported language values', () => {
     expect(isLocale('en')).toBe(true);
     expect(isLocale('pl')).toBe(true);

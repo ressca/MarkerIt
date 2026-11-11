@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Badge } from '@markerit/ui/components/badge';
 import { Button } from '@markerit/ui/components/button';
 import { Avatar, AvatarFallback, AvatarGroup } from '@markerit/ui/components/avatar';
@@ -61,14 +62,18 @@ export function ProjectRow({ project, onStatusChange, onDelete }: ProjectRowProp
         <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 font-bold text-xs text-primary ring-1 ring-primary/20">
           m.
         </div>
-        <div className="min-w-0 flex-1">
+        <Link
+          href={`/projects/${project.id}`}
+          aria-label={project.name}
+          className="min-w-0 flex-1"
+        >
           <strong className="block truncate font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
             {project.name}
           </strong>
           <small className="block truncate text-xs text-muted-foreground">
             {project.workspace}
           </small>
-        </div>
+        </Link>
       </div>
 
       {/* Badges, comments, members & timestamp */}

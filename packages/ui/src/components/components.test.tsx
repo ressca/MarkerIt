@@ -5,6 +5,8 @@ import { Avatar, AvatarBadge, AvatarFallback, AvatarGroup, AvatarGroupCount, Ava
 import { Badge } from './badge';
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './card';
 import { Input } from './input';
+import { Checkbox } from './checkbox';
+import { Textarea } from './textarea';
 import { Label } from './label';
 import { Separator } from './separator';
 import { Progress } from './progress';
@@ -52,6 +54,25 @@ describe('shared UI primitives', () => {
     render(<><Label htmlFor="name">Name</Label><Input id="name" placeholder="Name" data-testid="name" /></>);
     expect(screen.getByLabelText('Name')).toHaveAttribute('placeholder', 'Name');
     expect(screen.getByTestId('name')).toHaveAttribute('data-slot', 'input');
+  });
+
+  it('toggles the checkbox and forwards textarea props', async () => {
+    render(
+      <>
+        <Checkbox aria-label="Select reviewer" />
+        <Textarea aria-label="Comment" placeholder="Write a note" data-testid="textarea" />
+      </>,
+    );
+
+    const checkbox = screen.getByRole('checkbox', { name: 'Select reviewer' });
+    expect(checkbox).toHaveAttribute('data-slot', 'checkbox');
+    expect(checkbox).not.toBeChecked();
+
+    await userEvent.setup().click(checkbox);
+    expect(checkbox).toBeChecked();
+
+    expect(screen.getByTestId('textarea')).toHaveAttribute('data-slot', 'textarea');
+    expect(screen.getByLabelText('Comment')).toHaveAttribute('placeholder', 'Write a note');
   });
 
   it('renders the legacy button and status badge with defaults and custom variants', () => {
