@@ -30,6 +30,7 @@ import {
   TooltipContent,
   TooltipProvider,
 } from '@markerit/ui';
+import { logoutAccount } from '@markerit/api-client';
 import { WorkspaceSwitcher } from './workspace-switcher';
 import type { Workspace, UserProfile } from './types';
 import { cn } from 'cn';
@@ -103,12 +104,23 @@ export function Sidebar({
   async function handleLogout() {
     setLoggingOut(true);
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-    } catch {
-      // Ignore network errors; the local session is still cleared below.
-    }
-    if (typeof window !== 'undefined') {
-      window.location.assign('/login');
+      // Revoke the API session with CSRF protection, then clear the local
+      // cookie through the Next.js route. Both steps are best effort so a
+      // network failure cannot trap the user in a signed-in shell.
+      try {
+        await logoutAccount();
+      } catch {
+        // The API session may already be expired or unreachable.
+      }
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } catch {
+        // The local cookie is still cleared below by navigation to /login.
+      }
+    } finally {
+      if (typeof window !== 'undefined') {
+        window.location.assign('/login');
+      }
     }
   }
 

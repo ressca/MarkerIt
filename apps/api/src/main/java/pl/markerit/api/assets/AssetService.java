@@ -18,6 +18,8 @@ import java.util.UUID;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +40,8 @@ import pl.markerit.api.workspaces.WorkspaceService;
 
 @Service
 public class AssetService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AssetService.class);
 
     public static final int MAX_REVIEW_IMAGES_PER_PROJECT = 8;
     public static final long MAX_ASSET_SIZE_BYTES = 10L * 1024 * 1024;
@@ -90,6 +94,11 @@ public class AssetService {
         boolean reviewImage = Asset.PURPOSE_REVIEW_IMAGE.equals(purpose);
         if (reviewImage) {
             workspaces.requireProjectManager(project.getWorkspaceId(), userId);
+            if (Project.STATUS_CLOSED.equals(project.getStatus())) {
+                throw new ConflictException(
+                        "PROJECT_CLOSED",
+                        "Projekt jest zamknięty. Otwórz projekt, aby dodawać zdjęcia.");
+            }
         } else {
             workspaces.requireMember(project.getWorkspaceId(), userId);
         }
@@ -414,8 +423,13 @@ public class AssetService {
         try {
             storage.deleteObject(storageKey);
         } catch (RuntimeException exception) {
-            throw new IllegalStateException(
-                    "Nie udało się usunąć pliku z magazynu. Zgłoś to administratorowi.", exception);
+            // The database transaction has already committed. A storage failure
+            // must not turn a successful delete into a 500; log it for cleanup.
+            LOGGER.warn(
+                    "Nie udało się usunąć pliku {} z magazynu po usunięciu assetu. "
+                            + "Obiekt wymaga ręcznego czyszczenia.",
+                    storageKey,
+                    exception);
         }
     }
 

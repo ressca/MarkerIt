@@ -22,16 +22,38 @@ class SecurityConfigurationTest {
         assertDoesNotThrow(() -> configuration.jwtSecretKey("a-long-enough-secret-with-32-bytes"));
     }
 
-    @Test void resolvesAuthorizationHeaderBeforeSessionCookie() {
+    @Test void bearerTokenResolverOnlyReadsExplicitAuthorizationHeaders() {
         var resolver = configuration.bearerTokenResolver();
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setCookies(new Cookie(SecurityConfiguration.SESSION_COOKIE, "cookie-token"));
-        assertEquals("cookie-token", resolver.resolve(request));
+        assertNull(resolver.resolve(request));
         request.addHeader("Authorization", "Bearer header-token");
         assertEquals("header-token", resolver.resolve(request));
         request.removeHeader("Authorization");
         request.setCookies(new Cookie("other", "ignored"));
         assertNull(resolver.resolve(request));
+    }
+
+    @Test void requiresCsrfForUnsafeMethodsWithoutAuthorizationHeader() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setMethod("POST");
+        request.setCookies(new Cookie(SecurityConfiguration.SESSION_COOKIE, "cookie-token"));
+        assertTrue(SecurityConfiguration.requiresCsrfProtection(request));
+
+        request.addHeader("Authorization", "Bearer header-token");
+        assertFalse(SecurityConfiguration.requiresCsrfProtection(request));
+
+        request.removeHeader("Authorization");
+        request.setMethod("GET");
+        assertFalse(SecurityConfiguration.requiresCsrfProtection(request));
+        request.setMethod("HEAD");
+        assertFalse(SecurityConfiguration.requiresCsrfProtection(request));
+        request.setMethod("TRACE");
+        assertFalse(SecurityConfiguration.requiresCsrfProtection(request));
+        request.setMethod("OPTIONS");
+        assertFalse(SecurityConfiguration.requiresCsrfProtection(request));
+        request.setMethod("PATCH");
+        assertTrue(SecurityConfiguration.requiresCsrfProtection(request));
     }
 
     @Test void decoderRequiresValidIssuerAndActiveSession() {

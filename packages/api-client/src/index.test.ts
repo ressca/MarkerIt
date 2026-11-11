@@ -26,6 +26,7 @@ import {
   listWorkspaceMembers,
   listWorkspaces,
   loginAccount,
+  logoutAccount,
   registerAccount,
   resendVerification,
   submitReviewApproval,
@@ -134,6 +135,20 @@ describe('auth and review API operations', () => {
     expect(fetchMock.mock.calls[5][1].headers.get('X-XSRF-TOKEN')).toBe('csrf-token');
     expect(fetchMock.mock.calls[7][0]).toContain('/auth/verification/verify');
     expect(JSON.parse(fetchMock.mock.calls[7][1].body)).toEqual({ email: 'a@example.com', code: '012345' });
+  });
+
+  it('logs out with a CSRF-protected POST', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({ token: 'csrf-token' }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(logoutAccount()).resolves.toBeUndefined();
+
+    expect(fetchMock.mock.calls[0][0]).toContain('/auth/csrf');
+    expect(fetchMock.mock.calls[1][0]).toContain('/auth/logout');
+    expect(fetchMock.mock.calls[1][1].method).toBe('POST');
+    expect(fetchMock.mock.calls[1][1].headers.get('X-XSRF-TOKEN')).toBe('csrf-token');
   });
 
   it('encodes IDs and sends CSRF-protected pin comment payloads', async () => {

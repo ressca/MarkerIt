@@ -242,14 +242,16 @@ export function DiscussionPanel({
           className="flex items-start justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive"
         >
           <span>{actionError}</span>
-          <button
+          <Button
             type="button"
-            className="shrink-0"
+            variant="ghost"
+            size="icon-xs"
+            className="size-5 shrink-0 text-destructive hover:bg-destructive/15"
             aria-label={messages.project.close}
             onClick={() => setActionError(null)}
           >
             <X className="size-3.5" />
-          </button>
+          </Button>
         </div>
       )}
 
@@ -555,7 +557,7 @@ export function DiscussionPanel({
       )}
 
       <Dialog open={confirm !== null} onOpenChange={(open) => !open && setConfirm(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" closeLabel={messages.project.close}>
           <DialogHeader>
             <DialogTitle>
               {confirm?.kind === 'pin'

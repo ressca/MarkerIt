@@ -22,10 +22,12 @@ function SheetContent({
   children,
   side = 'left',
   showClose = true,
+  closeLabel = 'Zamknij',
   ...props
 }: DialogPrimitive.Popup.Props & {
   side?: 'left' | 'right';
   showClose?: boolean;
+  closeLabel?: string;
 }) {
   return (
     <DialogPrimitive.Portal data-slot="sheet-portal">
@@ -49,7 +51,7 @@ function SheetContent({
           <SheetClose
             data-slot="sheet-close-button"
             className="absolute top-3.5 right-3.5 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            aria-label="Zamknij"
+            aria-label={closeLabel}
           >
             <XIcon className="size-4" />
           </SheetClose>

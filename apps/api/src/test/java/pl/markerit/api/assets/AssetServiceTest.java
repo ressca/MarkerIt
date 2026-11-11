@@ -223,6 +223,27 @@ class AssetServiceTest {
         verify(storage).deleteObject(startsWith("projects/" + projectId + "/"));
     }
 
+    @Test void rejectsReviewImageUploadWhenProjectIsClosed() {
+        when(project.getStatus()).thenReturn(Project.STATUS_CLOSED);
+
+        ConflictException exception = assertThrows(ConflictException.class,
+                () -> service.upload(userId, projectId,
+                        new MockMultipartFile("file", "shot.png", "image/png", new byte[] {1})));
+
+        assertEquals("PROJECT_CLOSED", exception.getCode());
+        verify(storage, never()).putObject(anyString(), any(), anyLong(), anyString());
+    }
+
+    @Test void allowsAttachmentUploadWhenProjectIsClosed() throws IOException {
+        when(project.getStatus()).thenReturn(Project.STATUS_CLOSED);
+
+        AssetResponse response = service.uploadAttachment(userId, projectId,
+                new MockMultipartFile("file", "reply.png", "image/png", png(1, 1)));
+
+        assertEquals(Asset.PURPOSE_ATTACHMENT, response.purpose());
+        verify(workspaces).requireMember(workspaceId, userId);
+    }
+
     @Test void requiresProjectManagerRoleForUpload() {
         when(workspaces.requireProjectManager(workspaceId, userId))
                 .thenThrow(new ForbiddenAccessException("WORKSPACE_FORBIDDEN", "Brak dostępu."));
@@ -429,17 +450,23 @@ class AssetServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> service.delete(userId, assetId));
     }
 
-    @Test void surfacesStorageDeleteFailure() {
-        Asset asset = asset(UUID.randomUUID());
-        String storageKey = asset.getStorageKey();
-        when(assets.findByIdAndDeletedAtIsNull(asset.getId())).thenReturn(Optional.of(asset));
-        when(assets.isReferencedByReviewVersion(asset.getId())).thenReturn(false);
-        doThrow(new IllegalStateException("S3 down")).when(storage).deleteObject(storageKey);
+    @Test void doesNotFailDeleteWhenStorageCleanupFailsAfterCommit() {
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            Asset asset = asset(UUID.randomUUID());
+            String storageKey = asset.getStorageKey();
+            when(assets.findByIdAndDeletedAtIsNull(asset.getId())).thenReturn(Optional.of(asset));
+            when(assets.isReferencedByReviewVersion(asset.getId())).thenReturn(false);
+            doThrow(new IllegalStateException("S3 down")).when(storage).deleteObject(storageKey);
 
-        IllegalStateException exception = assertThrows(IllegalStateException.class,
-                () -> service.delete(userId, asset.getId()));
+            assertDoesNotThrow(() -> service.delete(userId, asset.getId()));
+            assertDoesNotThrow(() -> TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit));
 
-        assertTrue(exception.getMessage().contains("Nie udało się usunąć pliku"));
+            verify(assets).delete(asset);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test void acceptsContentTypeWithParameters() throws IOException {

@@ -129,7 +129,7 @@ describe('shared UI primitives', () => {
         </DropdownMenu>
 
         <Sheet open>
-          <SheetContent>
+          <SheetContent closeLabel="Close panel">
             <div>Panel</div>
           </SheetContent>
         </Sheet>
@@ -150,6 +150,7 @@ describe('shared UI primitives', () => {
     expect(screen.getByRole('menuitemcheckbox', { name: /Checkbox/ })).toBeInTheDocument();
     expect(screen.getByText('Group')).toBeInTheDocument();
     expect(screen.getByText('Panel')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close panel' })).toBeInTheDocument();
     expect(screen.getByText('One')).toBeInTheDocument();
     expect(screen.getByText('First panel')).toBeInTheDocument();
   });

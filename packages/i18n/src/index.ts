@@ -138,7 +138,6 @@ export const messages = {
       noReviewers: 'No reviewers assigned',
       createdBy: 'Created by',
       updatedAt: 'Updated',
-      openThread: 'Open thread',
       createThreadTitle: 'New review thread',
       createThreadDescription:
         'Choose a photo and invite reviewers. You are the thread author.',
@@ -175,8 +174,6 @@ export const messages = {
       versionNotePlaceholder: 'What changed in this version?',
       uploadVersion: 'Add version',
       uploadingVersion: 'Adding…',
-      versionLimitReached:
-        'All 8 project photo slots are used. Delete an unused photo first.',
       versionCreated: 'New version added.',
       versionError: 'Could not add the version.',
       chooseExistingPhoto: 'Choose a project photo',
@@ -199,7 +196,6 @@ export const messages = {
       closeThreadReason:
         'Every current reviewer must approve the latest version before you can close the thread.',
       closeThreadPending: 'Waiting for approval from:',
-      closeThreadError: 'Could not close the thread.',
       closeThreadSuccess: 'Thread closed.',
       deleteThread: 'Delete thread',
       deleteThreadTitle: 'Delete this thread?',
@@ -214,9 +210,6 @@ export const messages = {
       savingChanges: 'Saving…',
       editThreadError: 'Could not save the thread.',
       threadClosedNotice: 'This thread is closed. Start a new thread to continue reviewing.',
-      discussionPlaceholderTitle: 'Canvas and discussion coming next',
-      discussionPlaceholderDescription:
-        'Pins, comments and the discussion feed will live in this area in the next update.',
       canvasAddPinHint: 'Click the image to add a pin',
       canvasClosedLabel: 'Canvas unavailable because the review is closed',
       pinMarkerLabel: 'Pin {index}, {status}',
@@ -246,7 +239,6 @@ export const messages = {
       attachmentLimitError: 'You can attach at most 10 files.',
       attachmentUnsupported: 'Only PNG and JPEG files can be attached.',
       attachmentTooLarge: 'Each attachment can be at most 10 MB.',
-      attachmentUploadError: 'Could not upload the attachment.',
       attachmentNotFoundError: 'This attachment could not be found.',
       commentRequired: 'Write a comment before sending.',
       sendingComment: 'Sending…',
@@ -475,7 +467,6 @@ export const messages = {
       noReviewers: 'Brak przypisanych recenzentów',
       createdBy: 'Autor',
       updatedAt: 'Zaktualizowano',
-      openThread: 'Otwórz wątek',
       createThreadTitle: 'Nowy wątek recenzji',
       createThreadDescription:
         'Wybierz zdjęcie i zaproś recenzentów. To Ty jesteś autorem wątku.',
@@ -491,7 +482,7 @@ export const messages = {
         'Recenzenci oceniają najnowszą wersję. Możesz ich później zmienić.',
       reviewerLimitHint: 'Możesz przypisać maksymalnie 20 recenzentów.',
       reviewerReadOnlyHint: 'Osoby z rolą VIEWER nie mogą być recenzentami.',
-      viewerRole: 'VIEWER',
+      viewerRole: 'Obserwator',
       createThreadAction: 'Utwórz wątek',
       creatingThread: 'Tworzenie…',
       createThreadError: 'Nie udało się utworzyć wątku.',
@@ -513,8 +504,6 @@ export const messages = {
       versionNotePlaceholder: 'Co zmieniło się w tej wersji?',
       uploadVersion: 'Dodaj wersję',
       uploadingVersion: 'Dodawanie…',
-      versionLimitReached:
-        'Wszystkie 8 miejsc na zdjęcia jest zajęte. Usuń nieużywane zdjęcie.',
       versionCreated: 'Nowa wersja została dodana.',
       versionError: 'Nie udało się dodać wersji.',
       chooseExistingPhoto: 'Wybierz zdjęcie projektu',
@@ -538,7 +527,6 @@ export const messages = {
       closeThreadReason:
         'Wszyscy obecni recenzenci muszą zatwierdzić najnowszą wersję, zanim zamkniesz wątek.',
       closeThreadPending: 'Oczekujemy na zatwierdzenie:',
-      closeThreadError: 'Nie udało się zamknąć wątku.',
       closeThreadSuccess: 'Wątek został zamknięty.',
       deleteThread: 'Usuń wątek',
       deleteThreadTitle: 'Usunąć ten wątek?',
@@ -553,9 +541,6 @@ export const messages = {
       savingChanges: 'Zapisywanie…',
       editThreadError: 'Nie udało się zapisać wątku.',
       threadClosedNotice: 'Ten wątek jest zamknięty. Utwórz nowy wątek, aby kontynuować recenzję.',
-      discussionPlaceholderTitle: 'Kanwa i dyskusja w kolejnym kroku',
-      discussionPlaceholderDescription:
-        'Pinezki, komentarze i strumień dyskusji pojawią się tutaj w następnej aktualizacji.',
       canvasAddPinHint: 'Kliknij obraz, aby dodać pinezkę',
       canvasClosedLabel: 'Kanwa jest niedostępna, ponieważ recenzja jest zamknięta',
       pinMarkerLabel: 'Pinezka {index}, {status}',
@@ -585,7 +570,6 @@ export const messages = {
       attachmentLimitError: 'Możesz dołączyć maksymalnie 10 plików.',
       attachmentUnsupported: 'Dołączać można tylko pliki PNG i JPEG.',
       attachmentTooLarge: 'Każdy załącznik może mieć maksymalnie 10 MB.',
-      attachmentUploadError: 'Nie udało się wysłać załącznika.',
       attachmentNotFoundError: 'Nie znaleziono tego załącznika.',
       commentRequired: 'Napisz komentarz przed wysłaniem.',
       sendingComment: 'Wysyłanie…',

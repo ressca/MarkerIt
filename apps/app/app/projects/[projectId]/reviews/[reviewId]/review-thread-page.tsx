@@ -164,6 +164,7 @@ export function ReviewThreadPage({
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>('connecting');
   const discussionRef = useRef<DiscussionDto | null>(initialDiscussion ?? null);
   const selectedVersionIdRef = useRef('');
+  const latestVersionIdRef = useRef('');
   const discussionRequestRef = useRef(0);
   const loadRequestRef = useRef(0);
   const threadRequestRef = useRef(0);
@@ -237,6 +238,10 @@ export function ReviewThreadPage({
   const latestVersion = thread?.versions[thread.versions.length - 1];
   const selectedVersion =
     thread?.versions.find((version) => version.id === selectedVersionId) ?? latestVersion;
+
+  useEffect(() => {
+    latestVersionIdRef.current = latestVersion?.id ?? '';
+  }, [latestVersion?.id]);
 
   useEffect(() => {
     if (latestVersion && !thread?.versions.some((version) => version.id === selectedVersionId)) {
@@ -392,6 +397,24 @@ export function ReviewThreadPage({
         ) {
           return;
         }
+        if (event.type === 'VERSION_CREATED') {
+          const wasViewingLatest = versionId === latestVersionIdRef.current;
+          void refreshThread({ silent: true }).then((loaded) => {
+            if (!loaded) {
+              void loadDiscussion(versionId, { silent: true });
+              return;
+            }
+            const newest = loaded.versions[loaded.versions.length - 1];
+            if (wasViewingLatest && newest) {
+              // The user was looking at the previous latest version, so follow
+              // the new one instead of silently leaving them on a stale image.
+              setSelectedVersionId(newest.id);
+            } else {
+              void loadDiscussion(versionId, { silent: true });
+            }
+          });
+          return;
+        }
         void refreshThread({ silent: true });
         void loadDiscussion(versionId, { silent: true });
         return;
@@ -503,16 +526,23 @@ export function ReviewThreadPage({
     }
   }
 
+  async function deleteAttachmentsQuietly(assetIds: string[]): Promise<void> {
+    await Promise.allSettled(assetIds.map((assetId) => deleteProjectAsset(assetId)));
+  }
+
   async function handleAddPin(body: string, files: File[]): Promise<string | null> {
     if (!selectedVersion || !pinPoint) return messages.project.addPinError;
+    let attachmentAssetIds: string[] = [];
+    let pinCreated = false;
     try {
-      const attachmentAssetIds = await uploadAttachments(files);
+      attachmentAssetIds = await uploadAttachments(files);
       const pin = await createVersionPin(reviewId, selectedVersion.id, {
         xPercent: pinPoint.xPercent,
         yPercent: pinPoint.yPercent,
         body,
         attachmentAssetIds: attachmentAssetIds.length > 0 ? attachmentAssetIds : undefined,
       });
+      pinCreated = true;
       pinEventAtRef.current.set(pin.id, Date.now());
       if (discussionRef.current?.versionId === selectedVersion.id) {
         commitDiscussion(applyPinMutation(discussionRef.current, pin));
@@ -522,6 +552,7 @@ export function ReviewThreadPage({
       setNotice(messages.project.pinAdded);
       return null;
     } catch (cause) {
+      if (!pinCreated) await deleteAttachmentsQuietly(attachmentAssetIds);
       return apiErrorMessage(cause, messages, messages.project.addPinError);
     }
   }
@@ -532,18 +563,22 @@ export function ReviewThreadPage({
     body: string,
     files: File[],
   ): Promise<string | null> {
+    let attachmentAssetIds: string[] = [];
+    let commentCreated = false;
     try {
-      const attachmentAssetIds = await uploadAttachments(files);
+      attachmentAssetIds = await uploadAttachments(files);
       const comment = await createPinComment<CommentDto>(pinId, {
         body,
         parentCommentId: parentCommentId ?? undefined,
         attachmentAssetIds: attachmentAssetIds.length > 0 ? attachmentAssetIds : undefined,
       });
+      commentCreated = true;
       if (discussionRef.current) {
         commitDiscussion(applyCommentMutation(discussionRef.current, comment));
       }
       return null;
     } catch (cause) {
+      if (!commentCreated) await deleteAttachmentsQuietly(attachmentAssetIds);
       return apiErrorMessage(cause, messages, messages.project.commentCreateError);
     }
   }
@@ -1214,7 +1249,7 @@ function DecisionDialog({ decision, onOpenChange, messages, onSubmit }: Decision
 
   return (
     <Dialog open={decision !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" closeLabel={messages.project.close}>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>
@@ -1318,7 +1353,10 @@ function EditThreadDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
+      <DialogContent
+        className="max-h-[90dvh] overflow-y-auto sm:max-w-xl"
+        closeLabel={messages.project.close}
+      >
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>{messages.project.editThreadTitle}</DialogTitle>
@@ -1438,7 +1476,10 @@ function AddVersionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
+      <DialogContent
+        className="max-h-[90dvh] overflow-y-auto sm:max-w-xl"
+        closeLabel={messages.project.close}
+      >
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>{messages.project.addVersionTitle}</DialogTitle>
@@ -1589,7 +1630,7 @@ function DeleteThreadDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" closeLabel={messages.project.close}>
         <DialogHeader>
           <DialogTitle>{messages.project.deleteThreadTitle}</DialogTitle>
           <DialogDescription>{messages.project.deleteThreadDescription}</DialogDescription>

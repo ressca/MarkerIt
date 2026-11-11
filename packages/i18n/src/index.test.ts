@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { getMessages, isLocale, locales } from './index';
+import { getMessages, isLocale, locales, messages } from './index';
+
+function flattenKeys(value: object, prefix = ''): string[] {
+  return Object.entries(value).flatMap(([key, child]) => {
+    const path = `${prefix}${key}`;
+    return child !== null && typeof child === 'object' && !Array.isArray(child)
+      ? flattenKeys(child, `${path}.`)
+      : [path];
+  });
+}
 
 describe('localization', () => {
   it('provides English and Polish auth and landing copy', () => {
@@ -15,8 +24,7 @@ describe('localization', () => {
     expect(getMessages('pl').project.newThread).toBe('Nowy wątek');
     expect(getMessages('en').project.photosInProject).toBe('photos in this project');
     expect(getMessages('pl').project.photosInProject).toBe('zdjęć w projekcie');
-    expect(getMessages('en').project.discussionPlaceholderTitle).toBeTruthy();
-    expect(getMessages('pl').project.discussionPlaceholderDescription).toBeTruthy();
+    expect(getMessages('en').project.discussionTitle).toBe('Discussion');
     expect(getMessages('en').project.staleVersionError).toContain('new version');
     expect(getMessages('pl').project.reviewerLimitHint).toContain('20');
     expect(getMessages('en').project.projectClosedError).toBeTruthy();
@@ -32,6 +40,10 @@ describe('localization', () => {
     expect(getMessages('pl').project.realtimeConnecting).toBeTruthy();
     expect(getMessages('en').project.editCommentFor).toContain('{name}');
     expect(getMessages('en').project.discussionClosedNotice).toContain('closed');
+  });
+
+  it('keeps the same translation keys in both languages', () => {
+    expect(flattenKeys(messages.pl).sort()).toEqual(flattenKeys(messages.en).sort());
   });
 
   it('recognizes supported language values', () => {

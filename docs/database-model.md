@@ -1,7 +1,7 @@
 # MarkerIt — model bazy danych (propozycja)
 
 > **Status: ZAAKCEPTOWANY I WDROŻONY.** Model jest wdrażany migracjami Flyway
-> `V4`–`V6`. Tabele pod kolejne etapy powstają od razu; billing i integracje
+> `V4`–`V11`. Tabele pod kolejne etapy powstają od razu; billing i integracje
 > są poza zakresem.
 
 ## 1. Założenia
@@ -92,6 +92,10 @@ erDiagram
     pin_comments ||--o{ pin_comments : "odpowiedzi"
     pin_comments ||--o{ pin_comment_mentions : "wspomina"
     pin_comments ||--o{ pin_comment_reactions : "reakcje"
+    pin_comments ||--o{ pin_comment_attachments : "załączniki"
+    assets ||--o{ pin_comment_attachments : "plik"
+    reviews ||--o{ review_reviewers : "recenzenci"
+    users ||--o{ review_reviewers : "przypisany"
     reviews ||--o{ review_approvals : "decyzje"
 
     assets {
@@ -99,7 +103,6 @@ erDiagram
         uuid workspace_id FK
         uuid project_id FK
         uuid owner_user_id FK
-        uuid uploaded_by FK
         varchar purpose
         varchar kind
         varchar storage_key
@@ -118,6 +121,7 @@ erDiagram
         varchar title
         varchar status
         uuid created_by FK
+        uuid closed_by FK
         timestamptz created_at
         timestamptz closed_at
     }
@@ -155,9 +159,21 @@ erDiagram
         timestamptz edited_at
         timestamptz deleted_at
     }
+    review_reviewers {
+        uuid review_id PK
+        uuid user_id PK
+        uuid added_by FK
+        timestamptz created_at
+    }
+    pin_comment_attachments {
+        uuid pin_comment_id PK
+        uuid asset_id PK
+        int position
+    }
     review_approvals {
         uuid id PK
         uuid review_id FK
+        uuid review_version_id FK
         uuid user_id FK
         varchar decision
         timestamptz created_at
@@ -314,8 +330,7 @@ Bez zmian. Indeksy już istnieją.
 | `id` | `UUID` | PK |
 | `workspace_id` | `UUID` | `REFERENCES workspaces(id) ON DELETE CASCADE` (null dla awatara) |
 | `project_id` | `UUID` | `REFERENCES projects(id) ON DELETE CASCADE` (wymagane dla `REVIEW_IMAGE`) |
-| `owner_user_id` | `UUID` | `REFERENCES users(id) ON DELETE CASCADE` (wymagane dla `AVATAR`) |
-| `uploaded_by` | `UUID` | `REFERENCES users(id) ON DELETE SET NULL` |
+| `owner_user_id` | `UUID` | `REFERENCES users(id) ON DELETE CASCADE` (wymagane dla `AVATAR`; dla plików projektu właściciel uploadu) |
 | `purpose` | `VARCHAR(20)` | `NOT NULL`, `CHECK (purpose IN ('REVIEW_IMAGE','AVATAR','ATTACHMENT'))` |
 | `kind` | `VARCHAR(20)` | `CHECK (kind IN ('IMAGE','PDF','VIDEO','OTHER'))` |
 | `storage_provider` | `VARCHAR(20)` | `NOT NULL DEFAULT 'R2'`, `CHECK (storage_provider IN ('R2','S3','LOCAL'))` |
@@ -332,7 +347,8 @@ Bez zmian. Indeksy już istnieją.
 | `deleted_at` | `TIMESTAMPTZ` |  |
 
 - `UNIQUE (storage_provider, storage_key)`.
-- Indeks `(workspace_id, created_at DESC)` oraz `(project_id, created_at DESC)`.
+- Indeks `(workspace_id, created_at DESC) WHERE deleted_at IS NULL` oraz częściowy
+  `(project_id, created_at DESC) WHERE purpose = 'REVIEW_IMAGE' AND deleted_at IS NULL`.
 - Trigger `assets_enforce_project_limit`: maks. **8 zdjęć `REVIEW_IMAGE` na projekt**
   (aktywne, nieusunięte). To limit zużycia R2, nie bazy.
 - Trigger sprawdza też, że `project_id` należy do tego samego workspace co asset.
@@ -357,12 +373,28 @@ Review = kontener na jedną rzecz do oceny (np. makieta, plakat, ekran) wraz z w
 | `created_by` | `UUID` | `REFERENCES users(id) ON DELETE SET NULL` |
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT now()` |
 | `updated_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT now()` |
+| `closed_by` | `UUID` | `REFERENCES users(id) ON DELETE SET NULL` (dodane w `V9`) |
 | `closed_at` | `TIMESTAMPTZ` |  |
 | `deleted_at` | `TIMESTAMPTZ` | kolumna historyczna; wątki recenzji są usuwane twardo |
 
 - Indeksy: `(project_id, status)`, `(project_id, updated_at DESC)`.
 - Usunięcie wątku jest twarde: kaskadowo znikają wersje, pinezki, komentarze,
   decyzje i przypisania recenzentów.
+
+#### `review_reviewers`
+
+Przypisani recenzenci wątku (dodane w `V9`).
+
+| Kolumna | Typ | Ograniczenia |
+| --- | --- | --- |
+| `review_id` | `UUID` | `NOT NULL REFERENCES reviews(id) ON DELETE CASCADE` |
+| `user_id` | `UUID` | `NOT NULL REFERENCES users(id) ON DELETE CASCADE` |
+| `added_by` | `UUID` | `REFERENCES users(id) ON DELETE SET NULL` |
+| `created_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT now()` |
+
+- PK `(review_id, user_id)`, indeks `user_id`.
+- Zmiana przypisania jest nową generacją: decyzje sprzed `created_at`
+  bieżącego przypisania nie liczą się do zamknięcia wątku.
 
 #### `review_versions`
 
@@ -428,6 +460,21 @@ Review = kontener na jedną rzecz do oceny (np. makieta, plakat, ekran) wraz z w
   `pinCreateSchema` zawiera `body`).
 - Wątki przez `parent_comment_id`; głębokość ograniczana w serwisie.
 
+#### `pin_comment_attachments` (dodane w `V11`)
+
+| Kolumna | Typ | Ograniczenia |
+| --- | --- | --- |
+| `pin_comment_id` | `UUID` | `NOT NULL REFERENCES pin_comments(id) ON DELETE CASCADE` |
+| `asset_id` | `UUID` | `NOT NULL REFERENCES assets(id) ON DELETE RESTRICT` |
+| `position` | `INTEGER` | `NOT NULL DEFAULT 0 CHECK (position >= 0)` |
+
+- PK `(pin_comment_id, asset_id)`, `UNIQUE (pin_comment_id, position)`,
+  indeks `asset_id`.
+- Dołączać można wyłącznie assety `purpose = 'ATTACHMENT'` z tego samego
+  projektu; załączniki nie zajmują limitu zdjęć do recenzji.
+- `V11` dodaje też indeks `review_pins (review_version_id, created_at)` dla
+  aktywnych pinezek.
+
 #### `pin_comment_mentions`, `pin_comment_reactions`
 
 - `pin_comment_mentions (pin_comment_id, mentioned_user_id)` — PK złożony.
@@ -438,8 +485,12 @@ Review = kontener na jedną rzecz do oceny (np. makieta, plakat, ekran) wraz z w
 
 - `id`, `review_id`, `review_version_id`, `user_id`, `decision`
   (`APPROVED` / `CHANGES_REQUESTED`), `note`, `created_at`.
+- `review_version_id` (`UUID`, `NOT NULL REFERENCES review_versions(id) ON DELETE CASCADE`)
+  dodane w `V10`; migracja uzupełnia istniejące decyzje najnowszą wersją wątku
+  i usuwa wiersze bez wersji.
 - Decyzja dotyczy konkretnej wersji. Nowa wersja wymaga ponownych decyzji
   aktualnie przypisanych recenzentów.
+- Indeks `(review_id, user_id, review_version_id, created_at DESC)`.
 - Historia decyzji (bez unikatu); aktualna = najnowsza dla najnowszej wersji,
   utworzona po dodaniu bieżącego przypisania recenzenta.
 
@@ -545,8 +596,12 @@ Publiczne/wewnętrzne linki do review lub całego projektu.
 | --- | --- |
 | `OWNER` | wszystko, transfer własności, usunięcie workspace |
 | `ADMIN` | zarządzanie członkami, projektami, ustawieniami |
-| `MEMBER` | tworzenie/edycja projektów, review, komentarze |
-| `VIEWER` | tylko podgląd i komentarze według grantów |
+| `MEMBER` | tworzenie/edycja projektów, wątków i wersji, recenzowanie, komentarze |
+| `VIEWER` | podgląd, pinezki, komentarze i załączniki w otwartych wątkach; bez edycji wątków, obrazów i decyzji |
+
+W obecnym wdrożeniu review korzysta z ról workspace. Granty projektowe
+(`VIEW`/`COMMENT`/`EDIT`/`ADMIN`) istnieją w schemacie, ale nie sterują jeszcze
+widocznością ani akcjami w UI.
 
 ### Uprawnienia projektowe
 
@@ -581,8 +636,8 @@ Członek workspace'u widzi projekty `WORKSPACE`; projekt `PRIVATE` wymaga grantu
 9. **Pliki w magazynie S3/R2** — baza przechowuje tylko metadane, `storage_provider` i `storage_key`.
 10. **Twarde limity** — 3 przestrzenie, 3 projekty w przestrzeni, 8 zdjęć
     `REVIEW_IMAGE` na projekt; egzekwowane w serwisie i triggerami PostgreSQL.
-    Liczba review, wersji, pinezek i komentarzy jest nieograniczona — limit dotyczy
-    wyłącznie miejsca w Cloudflare R2.
+    Liczba review, wersji, pinezek, komentarzy i załączników komentarzy jest
+    nieograniczona — limit dotyczy wyłącznie obrazów do recenzji w magazynie S3.
 
 ## 8. Wdrożone migracje
 
@@ -597,6 +652,7 @@ Wszystkie tabele powstają od razu (wariant „od razu”):
 | `V8__allow_s3_storage_provider.sql` | `storage_provider` dopuszcza `S3` (MinIO i inne magazyny zgodne z S3) obok `R2` i `LOCAL` |
 | `V9__review_thread_reviewers.sql` | `review_reviewers`, `reviews.closed_by` |
 | `V10__review_approvals_version.sql` | `review_approvals.review_version_id`, backfill do najnowszej wersji i indeks wersjonowanych decyzji |
+| `V11__pin_comments_attachments.sql` | `pin_comment_attachments`, indeks aktywnych pinezek wersji |
 
 Billing i integracje (API keys, webhooks) są świadomie pominięte.
 
@@ -609,7 +665,8 @@ Limity są egzekwowane w serwisach oraz triggerami w bazie:
 | Przestrzenie robocze na użytkownika | 3 | `WorkspaceService` + trigger `workspaces_enforce_limit` |
 | Projekty w przestrzeni | 3 | `ProjectService` + trigger `projects_enforce_limit` |
 | Zdjęcia do review (`REVIEW_IMAGE`) w projekcie | 8 | trigger `assets_enforce_project_limit` + walidacja w serwisie uploadu |
-| Review, wersje, pinezki, komentarze | bez limitu | — (limit dotyczy tylko obiektów w R2) |
+| Załączniki komentarzy (`ATTACHMENT`) w projekcie | bez limitu | nie zajmują limitu zdjęć; maks. 10 na komentarz |
+| Review, wersje, pinezki, komentarze | bez limitu | — (limit dotyczy tylko obrazów do recenzji w magazynie) |
 
 ## 10. Przechowywanie plików
 
@@ -620,9 +677,12 @@ Limity są egzekwowane w serwisach oraz triggerami w bazie:
   `storage_key`, `content_type`, `original_name`, `size_bytes`, `checksum_sha256`,
   `width`, `height`). `storage_provider` przyjmuje `R2`, `S3` lub `LOCAL`
   (migracja `V8`).
-- Odczyty i usuwanie plików korzystają z providera zapisanego na assecie, a nie
-  z aktualnie skonfigurowanego backendu.
-- Zdjęcia profilowe: `assets.purpose = 'AVATAR'`, `users.avatar_asset_id`.
+- Odczyty i usuwanie plików wybierają backend na podstawie providera zapisanego
+  na assecie. W danej konfiguracji istnieje jednak tylko backend wskazany przez
+  `STORAGE_PROVIDER`, więc zmiana providera bez migracji obiektów sprawia, że
+  starsze pliki stają się nieczytelne (brak automatycznej migracji).
+- Zdjęcia profilowe: schemat rezerwuje `assets.purpose = 'AVATAR'` i
+  `users.avatar_asset_id`, ale upload awatarów nie jest jeszcze zaimplementowany.
 - Zdjęcia do review: `assets.purpose = 'REVIEW_IMAGE'`, podpięte przez
   `review_version_assets`.
 - Miniatury/preview: `asset_variants`.
@@ -645,4 +705,6 @@ Limity są egzekwowane w serwisach oraz triggerami w bazie:
 5. Wszystkie tabele od razu. ✅
 6. Bez billingu. ✅
 7. Bez importu danych z `localStorage` — startujemy od nowa. ✅
-8. `display_name` i `avatar_asset_id` w `users`; pliki w Cloudflare R2. ✅
+8. `display_name` i `avatar_asset_id` w `users`; awatary są zarezerwowane
+   w schemacie, ale ich upload nie jest jeszcze wdrożony. Pliki review trafiają
+   do magazynu S3/R2. ✅

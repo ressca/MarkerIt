@@ -181,6 +181,8 @@ export function ProjectPage({
   const statusLabel = projectStatusLabel(messages, project.status);
   const toneLabel = projectToneLabel(messages, project.tone);
   const projectClosed = project.status === 'CLOSED';
+  const currentMember = members.find((member) => member.id === initialUser.id);
+  const canWrite = Boolean(currentMember && currentMember.role !== 'VIEWER');
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
@@ -291,7 +293,7 @@ export function ProjectPage({
               type="button"
               size="sm"
               onClick={() => setUploadOpen(true)}
-              disabled={projectClosed || assets.length >= MAX_PROJECT_PHOTOS}
+              disabled={!canWrite || projectClosed || assets.length >= MAX_PROJECT_PHOTOS}
               className="w-fit gap-1.5"
             >
               <Plus className="size-4" />
@@ -334,7 +336,7 @@ export function ProjectPage({
                   size="sm"
                   className="mt-4 gap-1.5"
                   onClick={() => setUploadOpen(true)}
-                  disabled={projectClosed}
+                  disabled={!canWrite || projectClosed}
                 >
                   <Upload className="size-4" />
                   {messages.project.addPhoto}
@@ -356,7 +358,7 @@ export function ProjectPage({
                       className="aspect-square w-full object-cover"
                       loading="lazy"
                     />
-                    {!referenced && (
+                    {!referenced && canWrite && (
                       <Button
                         type="button"
                         variant="destructive"
@@ -392,7 +394,7 @@ export function ProjectPage({
               type="button"
               size="sm"
               onClick={() => setCreateOpen(true)}
-              disabled={assets.length === 0 || projectClosed}
+              disabled={!canWrite || assets.length === 0 || projectClosed}
               className="w-fit gap-1.5"
             >
               <Plus className="size-4" />
@@ -415,7 +417,7 @@ export function ProjectPage({
                   size="sm"
                   className="mt-4 gap-1.5"
                   onClick={() => setCreateOpen(true)}
-                  disabled={assets.length === 0 || projectClosed}
+                  disabled={!canWrite || assets.length === 0 || projectClosed}
                 >
                   <Plus className="size-4" />
                   {messages.project.newThread}
@@ -546,7 +548,7 @@ function PhotoUploadDialog({ open, onOpenChange, messages, onUpload }: PhotoUplo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" closeLabel={messages.project.close}>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>{messages.project.uploadPhotoTitle}</DialogTitle>
@@ -631,7 +633,7 @@ function DeletePhotoDialog({
 
   return (
     <Dialog open={asset !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" closeLabel={messages.project.close}>
         <DialogHeader>
           <DialogTitle>{messages.project.deletePhotoTitle}</DialogTitle>
           <DialogDescription>{messages.project.deletePhotoDescription}</DialogDescription>

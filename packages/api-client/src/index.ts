@@ -188,6 +188,18 @@ export async function loginAccount(input: { email: string; password: string }): 
   });
 }
 
+/**
+ * Revokes the current API session. Callers that also maintain a Next.js cookie
+ * should clear it afterwards (or in a `finally` block) because the API call may
+ * fail while the local cookie is still present.
+ */
+export async function logoutAccount(): Promise<void> {
+  await apiRequest<void>('auth/logout', {
+    method: 'POST',
+    headers: await csrfHeaders(),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Dashboard: workspaces and projects
 // ---------------------------------------------------------------------------

@@ -57,9 +57,66 @@ Open the services at:
 | MinIO console | http://localhost:9001 (user/password: `minioadmin` by default) |
 | PostgreSQL | `localhost:5432` (database/user: `markerit`, password: `markerit_dev`) |
 
-The API waits until PostgreSQL passes its health check before starting. The database credentials are development defaults only; override `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in a root `.env` file if needed. The API provides health, authentication, workspace and project endpoints. Users, sessions, workspaces and projects are stored in PostgreSQL; the schema also contains tables for reviews, pins, comments, sharing, notifications and audit events.
+The API waits until PostgreSQL passes its health check before starting. The database credentials are development defaults only; override `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in a root `.env` file if needed. The API provides health, authentication, workspace, project, asset, review, pin, comment and approval endpoints. Users, sessions, workspaces and projects are stored in PostgreSQL; the schema also contains tables for reviews, pins, comments, sharing, notifications and audit events.
 
-Review images are stored in an S3-compatible bucket, not in PostgreSQL. The compose stack starts MinIO on port 9000, its console on port 9001, and a one-off `minio-init` service that creates the `markerit` bucket (override with `S3_BUCKET`) when it is missing. Buckets stay private: files are read through the authenticated `GET /api/v1/assets/{id}/content` endpoint, so MinIO anonymous download is not enabled. The development credentials are `minioadmin` / `minioadmin`; override `S3_ACCESS_KEY` and `S3_SECRET_KEY` if needed. For a local API process outside compose, the storage defaults point at `http://localhost:9000` and the `markerit` bucket. To use Cloudflare R2 instead, set `STORAGE_PROVIDER=R2`, `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_REGION=auto`, `S3_PATH_STYLE=false`, and optionally `S3_PUBLIC_BASE_URL` to the public bucket or custom domain URL. Provider names are case-insensitive. Set `STORAGE_PROVIDER=LOCAL` to store uploads on disk under `LOCAL_STORAGE_DIR` without MinIO.
+Review images and comment attachments are stored in an S3-compatible bucket, not in PostgreSQL. The compose stack starts MinIO on port 9000, its console on port 9001, and a one-off `minio-init` service that creates the `markerit` bucket (override with `S3_BUCKET`) when it is missing. Buckets stay private: files are read through the authenticated `GET /api/v1/assets/{id}/content` endpoint, so MinIO anonymous download is not enabled. The development credentials are `minioadmin` / `minioadmin`; override `S3_ACCESS_KEY` and `S3_SECRET_KEY` if needed. For a local API process outside compose, the storage defaults point at `http://localhost:9000` and the `markerit` bucket. To use Cloudflare R2 instead, set `STORAGE_PROVIDER=R2`, `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_REGION=auto` and `S3_PATH_STYLE=false`. `S3_PUBLIC_BASE_URL` is reserved for a future public/CDN asset URL and is not used by the current API. Provider names are case-insensitive. Set `STORAGE_PROVIDER=LOCAL` to store uploads on disk under `LOCAL_STORAGE_DIR` without MinIO.
+
+### Local MinIO only
+
+To run just the storage dependency while the API runs on the host:
+
+```sh
+docker compose up -d minio minio-init
+
+# The API defaults already match this setup:
+STORAGE_PROVIDER=S3 \
+S3_ENDPOINT=http://localhost:9000 \
+S3_ACCESS_KEY=minioadmin \
+S3_SECRET_KEY=minioadmin \
+S3_BUCKET=markerit \
+S3_REGION=us-east-1 \
+S3_PATH_STYLE=true \
+pnpm dev:api
+```
+
+The MinIO console is available at http://localhost:9001 with `minioadmin` / `minioadmin`. Bucket contents stay private; the API streams them through the authenticated asset endpoint. Use `docker compose down -v` to delete the local MinIO volume as well as PostgreSQL data.
+
+### Project review workflow
+
+The project-review feature adds:
+
+- A project page with a library of up to 8 review images and a list of review threads.
+- Versioned review threads: each version points at one review image, and new versions start a fresh decision round.
+- Reviewer assignment (up to 20 workspace members with a write role) and approvals scoped to the latest version.
+- Pins on the image, threaded comments, image attachments on comments, resolution state, and live updates.
+- Close rules that require every assigned reviewer to approve the latest version, and delete rules that clean up unused images and attachments from PostgreSQL and object storage.
+
+Application routes:
+
+| Route | Purpose |
+| --- | --- |
+| `/projects/[projectId]` | Project photo library and review-thread list |
+| `/projects/[projectId]/reviews/[reviewId]` | Version canvas, pins, discussion and approvals |
+
+The review page subscribes to updates over a native STOMP WebSocket (no SockJS) at `/ws` and consumes `/topic/reviews/{reviewId}`. The API also publishes review, version and approval events on `/topic/projects/{projectId}`, but the current project page does not subscribe to that topic yet. The handshake reuses the `markerit_session` cookie. Event types are `PIN_CREATED`, `PIN_UPDATED`, `PIN_DELETED`, `COMMENT_CREATED`, `COMMENT_UPDATED`, `COMMENT_DELETED`, `REVIEW_CREATED`, `REVIEW_UPDATED`, `REVIEW_DELETED`, `VERSION_CREATED` and `APPROVAL_CREATED`.
+
+Product limits: 3 workspaces per user, 3 projects per workspace, 8 review images per project, up to 20 reviewers per thread, 10 attachments per comment, and unlimited reviews, versions, pins and comments. Images and attachments are PNG or JPEG, at most 10 MB and 80 megapixels (12000 px per side). See [`docs/project-review.md`](docs/project-review.md) for the domain model, permissions and API list.
+
+### Storage configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `STORAGE_PROVIDER` | `S3` | `S3`, `R2` or `LOCAL` (case-insensitive) |
+| `S3_ENDPOINT` | `http://localhost:9000` (API outside compose) | S3-compatible endpoint; compose uses `http://minio:9000` |
+| `S3_ACCESS_KEY` | `minioadmin` | Access key; R2 fallback reads `R2_ACCESS_KEY_ID` |
+| `S3_SECRET_KEY` | `minioadmin` | Secret key; R2 fallback reads `R2_SECRET_ACCESS_KEY` |
+| `S3_BUCKET` | `markerit` | Bucket name; R2 fallback reads `R2_BUCKET` |
+| `S3_REGION` | `us-east-1` | Signing region (`auto` for R2) |
+| `S3_PATH_STYLE` | `true` | Path-style addressing (required by MinIO) |
+| `S3_PUBLIC_BASE_URL` | `http://localhost:9000/markerit` | Reserved for future public/CDN URLs; currently unused |
+| `LOCAL_STORAGE_DIR` | `${java.io.tmpdir}/markerit-storage` | Directory for `STORAGE_PROVIDER=LOCAL` |
+
+Only the configured backend is instantiated. Each asset records the provider it was written with, but changing `STORAGE_PROVIDER` makes assets written by the previous provider unreadable because that backend is no longer available; there is no automatic migration. Keep the same provider or copy/migrate the objects before switching. Project and workspace deletion do not remove stored objects; only deleting a review thread cleans up the images and attachments that are no longer referenced.
 
 Asset metadata responses include `originalName` and a `url` relative to the API base (`assets/{id}/content`). Clients that already prefix requests with `/api/v1` must not add the API base again. Content responses are immutable and include `Cache-Control: private, max-age=31536000, immutable` plus an `ETag` derived from the asset checksum.
 
@@ -138,7 +195,20 @@ pnpm nx run app:test:coverage
 pnpm nx run api:test:coverage
 ```
 
-The frontend coverage command enforces at least 80% statements, branches, functions, and lines. The backend JaCoCo verification is configured for at least 80% instruction coverage. Frontend coverage is 98.35%. The API suite currently has 138 tests, the JaCoCo report shows 85.55% instruction coverage, and `jacocoCoverageVerification` passes. Reports are generated under `coverage/` for the frontend and `apps/api/build/reports/jacoco/test/html/` for the API.
+The frontend coverage command enforces at least 80% statements, branches, functions, and lines. The backend JaCoCo verification is configured for at least 80% instruction coverage. The frontend suite currently has 203 tests with 91.72% statement, 82.46% branch, 83.74% function and 91.72% line coverage. The API suite has 285 tests, the JaCoCo report shows 88.09% instruction coverage, and `jacocoCoverageVerification` passes. Reports are generated under `coverage/` for the frontend and `apps/api/build/reports/jacoco/test/html/` for the API.
+
+Full verification from a clean checkout:
+
+```sh
+pnpm nx run-many -t lint
+pnpm nx run app:test:coverage
+pnpm exec tsc -p apps/app/tsconfig.json --noEmit
+pnpm --filter @markerit/app exec next build
+(cd apps/api && gradle test jacocoCoverageVerification --project-cache-dir /tmp/markerit-gradle-cache --rerun-tasks)
+docker compose config
+```
+
+The Next.js build regenerates `apps/app/next-env.d.ts` with a production path. Keep the committed development form (`./.next/dev/types/...`) and revert that generated change if it appears in `git status`.
 
 For CI, `affected` limits work to changes since a base revision and their dependents:
 
@@ -161,10 +231,10 @@ Workspace packages are linked with pnpm's `workspace:*` protocol and imported by
 ```ts
 import { Button, StatusBadge } from '@markerit/ui';
 import { pinCreateSchema } from '@markerit/validators';
-import { apiRequest, createReviewPin } from '@markerit/api-client';
+import { apiRequest, createVersionPin } from '@markerit/api-client';
 ```
 
-The API client uses `http://localhost:8080/api/v1` by default. Set `NEXT_PUBLIC_API_URL` to override it. The landing page uses `http://localhost:3000` as the application URL by default; set `NEXT_PUBLIC_APP_URL` to override it. Set `NEXT_PUBLIC_SITE_URL` to the public landing domain in production; it is used for canonical metadata, `robots.txt`, and `sitemap.xml` (the local default is `http://localhost:3001`). The application dashboard reads workspaces and projects from the API and persists all changes in PostgreSQL. Review images and avatars are stored in an S3-compatible bucket (MinIO locally, Cloudflare R2 in production); the database keeps their metadata.
+The API client uses `http://localhost:8080/api/v1` by default. Set `NEXT_PUBLIC_API_URL` to override it. The landing page uses `http://localhost:3000` as the application URL by default; set `NEXT_PUBLIC_APP_URL` to override it. Set `NEXT_PUBLIC_SITE_URL` to the public landing domain in production; it is used for canonical metadata, `robots.txt`, and `sitemap.xml` (the local default is `http://localhost:3001`). The application dashboard and project pages read workspaces, projects, review threads and discussion data from the API and persist all changes in PostgreSQL. Review images and comment attachments are stored in an S3-compatible bucket (MinIO locally, Cloudflare R2 in production); the database keeps their metadata. The schema reserves an `AVATAR` asset purpose, but avatar upload is not implemented yet. Project and review pages load their data on the client; the review page refreshes over the WebSocket feed.
 
 Both Next.js apps use Tailwind CSS v4 through their PostCSS configuration. The shared shadcn/ui theme and global CSS live in `packages/ui/src/styles/globals.css` and are imported by each app. The paired `components.json` files in `apps/app`, `apps/landing`, and `packages/ui` route generated shared components to `@markerit/ui`. To add a component from the repository root, for example:
 

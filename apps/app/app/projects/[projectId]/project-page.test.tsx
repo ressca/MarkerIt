@@ -77,6 +77,14 @@ const member: WorkspaceMemberDto = {
   role: 'MEMBER',
 };
 
+const authorMember: WorkspaceMemberDto = {
+  id: user.id,
+  displayName: user.displayName,
+  email: user.email,
+  initials: user.initials,
+  role: 'OWNER',
+};
+
 const reviewSummary: ReviewSummaryDto = {
   id: 'review-1',
   projectId: project.id,
@@ -143,7 +151,7 @@ function renderPage(overrides: {
       initialProject={overrides.project ?? project}
       initialAssets={assets}
       initialReviews={reviews}
-      initialMembers={overrides.members ?? [member]}
+      initialMembers={overrides.members ?? [authorMember, member]}
     />,
   );
 }
@@ -351,6 +359,24 @@ describe('ProjectPage', () => {
     expect(screen.getByText(/Projekt jest zamknięty/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Nowy wątek/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Dodaj zdjęcie/ })).toBeDisabled();
+  });
+
+  it('disables project mutations for workspace viewers', () => {
+    renderPage({
+      members: [{ ...authorMember, role: 'VIEWER' }, member],
+      assets: [asset, secondAsset],
+      reviews: [],
+    });
+
+    for (const button of screen.getAllByRole('button', { name: /Nowy wątek/ })) {
+      expect(button).toBeDisabled();
+    }
+    for (const button of screen.getAllByRole('button', { name: /Dodaj zdjęcie/ })) {
+      expect(button).toBeDisabled();
+    }
+    expect(
+      screen.queryByRole('button', { name: 'Usuń zdjęcie: baner.png' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows asset limit errors inside the upload dialog', async () => {

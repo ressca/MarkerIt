@@ -706,6 +706,64 @@ describe('ReviewThreadPage', () => {
     });
   });
 
+  it('deletes uploaded pin attachments when pin creation fails', async () => {
+    const testUser = userEvent.setup();
+    const attachment = { ...asset, id: 'attachment-pin-fail', purpose: 'ATTACHMENT', originalName: 'detal.png' };
+    api.uploadProjectAttachment.mockResolvedValue(attachment);
+    api.createVersionPin.mockRejectedValue(new ApiError(409, 'REVIEW_CLOSED', 'closed'));
+    api.deleteProjectAsset.mockResolvedValue(undefined);
+    renderThread(author, makeReview(), project, makeDiscussion());
+
+    const canvas = await screen.findByTestId('review-canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 100,
+      height: 100,
+      right: 100,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    fireEvent.click(canvas, { clientX: 50, clientY: 50 });
+
+    const dialog = screen.getByRole('dialog');
+    await testUser.upload(
+      within(dialog).getByLabelText('Załączniki'),
+      new File(['png'], 'detal.png', { type: 'image/png' }),
+    );
+    await testUser.type(within(dialog).getByLabelText('Komentarz do pinezki'), 'Nie uda się');
+    await testUser.click(within(dialog).getByRole('button', { name: 'Dodaj pinezkę' }));
+
+    await waitFor(() =>
+      expect(api.deleteProjectAsset).toHaveBeenCalledWith('attachment-pin-fail'),
+    );
+  });
+
+  it('deletes uploaded reply attachments when the comment cannot be created', async () => {
+    const testUser = userEvent.setup();
+    const attachment = { ...asset, id: 'attachment-reply-fail', purpose: 'ATTACHMENT', originalName: 'reply.png' };
+    api.uploadProjectAttachment.mockResolvedValue(attachment);
+    api.createPinComment.mockRejectedValue(new ApiError(409, 'REVIEW_CLOSED', 'closed'));
+    api.deleteProjectAsset.mockResolvedValue(undefined);
+    renderThread(author, makeReview(), project, makeDiscussion());
+    const card = await screen.findByTestId('comment-comment-1');
+
+    await testUser.click(within(card).getByRole('button', { name: 'Odpowiedz' }));
+    const form = screen.getByTestId('reply-form-comment-1');
+    await testUser.type(within(form).getByLabelText('Odpowiedź'), 'Nie uda się');
+    await testUser.upload(
+      within(form).getByLabelText('Załączniki'),
+      new File(['png'], 'reply.png', { type: 'image/png' }),
+    );
+    await testUser.click(within(form).getByRole('button', { name: 'Wyślij odpowiedź' }));
+
+    await waitFor(() =>
+      expect(api.deleteProjectAsset).toHaveBeenCalledWith('attachment-reply-fail'),
+    );
+  });
+
   it('highlights the matching pin when hovering a comment and vice versa', async () => {
     const testUser = userEvent.setup();
     renderThread(author, makeReview(), project, makeDiscussion());
@@ -816,6 +874,81 @@ describe('ReviewThreadPage', () => {
       expect(api.getReviewDiscussion.mock.calls.length).toBeGreaterThan(callsBefore),
     );
     expect(api.getReview).toHaveBeenCalledWith('review-1');
+  });
+
+  it('switches to the new latest version when VERSION_CREATED arrives while viewing the latest', async () => {
+    const thirdVersion = {
+      id: 'version-3',
+      versionNumber: 3,
+      note: 'Najnowsza wersja.',
+      asset: newAsset,
+      createdAt: '2026-11-11T10:00:00Z',
+      createdByName: author.displayName,
+    };
+    api.getReview.mockResolvedValue(
+      makeReview({ versionsOverride: [...versions, thirdVersion] }),
+    );
+    renderThread(author);
+    await screen.findByTestId('discussion-panel');
+    const options = lastRealtimeOptions();
+
+    act(() =>
+      options.onEvent({
+        type: 'VERSION_CREATED',
+        reviewId: 'review-1',
+        versionId: 'version-3',
+        payloadType: 'VERSION',
+        occurredAt: '2026-11-11T10:00:00Z',
+        payload: thirdVersion,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(api.getReviewDiscussion).toHaveBeenCalledWith('review-1', 'version-3'),
+    );
+    expect(await screen.findByRole('button', { name: /Wersja 3/ })).toBeInTheDocument();
+    expect(screen.queryByText('Starsza wersja')).not.toBeInTheDocument();
+  });
+
+  it('keeps an older selected version when VERSION_CREATED arrives', async () => {
+    const thirdVersion = {
+      id: 'version-3',
+      versionNumber: 3,
+      note: 'Najnowsza wersja.',
+      asset: newAsset,
+      createdAt: '2026-11-11T10:00:00Z',
+      createdByName: author.displayName,
+    };
+    api.getReview.mockResolvedValue(
+      makeReview({ versionsOverride: [...versions, thirdVersion] }),
+    );
+    const testUser = userEvent.setup();
+    renderThread(author);
+    await screen.findByTestId('discussion-panel');
+    await testUser.click(screen.getByRole('button', { name: /Wersja 2/ }));
+    await testUser.click(await screen.findByRole('menuitem', { name: /Wersja 1/ }));
+    await waitFor(() =>
+      expect(api.getReviewDiscussion).toHaveBeenCalledWith('review-1', 'version-1'),
+    );
+    api.getReviewDiscussion.mockClear();
+    const options = lastRealtimeOptions();
+
+    act(() =>
+      options.onEvent({
+        type: 'VERSION_CREATED',
+        reviewId: 'review-1',
+        versionId: 'version-3',
+        payloadType: 'VERSION',
+        occurredAt: '2026-11-11T10:00:00Z',
+        payload: thirdVersion,
+      }),
+    );
+
+    await waitFor(() => expect(api.getReview).toHaveBeenCalledWith('review-1'));
+    await waitFor(() =>
+      expect(api.getReviewDiscussion).toHaveBeenCalledWith('review-1', 'version-1'),
+    );
+    expect(api.getReviewDiscussion).not.toHaveBeenCalledWith('review-1', 'version-3');
   });
 
   it('adds a reply with an attachment and renders it in the feed', async () => {
