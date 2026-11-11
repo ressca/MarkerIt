@@ -55,7 +55,7 @@ Open the services at:
 | API health | http://localhost:8080/api/health |
 | PostgreSQL | `localhost:5432` (database/user: `markerit`, password: `markerit_dev`) |
 
-The API waits until PostgreSQL passes its health check before starting. The database credentials are development defaults only; override `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in a root `.env` file if needed. The API currently provides health and authentication endpoints and stores users and revocable sessions in PostgreSQL.
+The API waits until PostgreSQL passes its health check before starting. The database credentials are development defaults only; override `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in a root `.env` file if needed. The API provides health, authentication, workspace and project endpoints. Users, sessions, workspaces and projects are stored in PostgreSQL; the schema also contains tables for reviews, pins, comments, sharing, notifications and audit events.
 
 Stop the services with `Ctrl+C`, or run `docker compose down`. The named PostgreSQL volume is retained by default; `docker compose down -v` also deletes that development database. If you change workspace dependencies, refresh the shared Node install volume and restart the apps:
 
@@ -158,7 +158,7 @@ import { pinCreateSchema } from '@markerit/validators';
 import { apiRequest, createReviewPin } from '@markerit/api-client';
 ```
 
-The API client uses `http://localhost:8080/api/v1` by default. Set `NEXT_PUBLIC_API_URL` to override it. The landing page uses `http://localhost:3000` as the application URL by default; set `NEXT_PUBLIC_APP_URL` to override it. Set `NEXT_PUBLIC_SITE_URL` to the public landing domain in production; it is used for canonical metadata, `robots.txt`, and `sitemap.xml` (the local default is `http://localhost:3001`). The application dashboard currently contains static example data.
+The API client uses `http://localhost:8080/api/v1` by default. Set `NEXT_PUBLIC_API_URL` to override it. The landing page uses `http://localhost:3000` as the application URL by default; set `NEXT_PUBLIC_APP_URL` to override it. Set `NEXT_PUBLIC_SITE_URL` to the public landing domain in production; it is used for canonical metadata, `robots.txt`, and `sitemap.xml` (the local default is `http://localhost:3001`). The application dashboard reads workspaces and projects from the API and persists all changes in PostgreSQL. Review images and avatars are stored in Cloudflare R2; the database keeps their metadata.
 
 Both Next.js apps use Tailwind CSS v4 through their PostCSS configuration. The shared shadcn/ui theme and global CSS live in `packages/ui/src/styles/globals.css` and are imported by each app. The paired `components.json` files in `apps/app`, `apps/landing`, and `packages/ui` route generated shared components to `@markerit/ui`. To add a component from the repository root, for example:
 

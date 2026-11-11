@@ -29,6 +29,7 @@ public class JwtTokenService {
                 .expiresAt(session.getExpiresAt())
                 .id(session.getId().toString())
                 .claim("email", user.getEmail())
+                .claim("name", user.getDisplayName())
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

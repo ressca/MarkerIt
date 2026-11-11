@@ -69,6 +69,12 @@ services:
       EMAIL_FROM: ${EMAIL_FROM:-noreply@markerit.local}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_API_URL: ${RESEND_API_URL:-https://api.resend.com/emails}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-R2}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-markerit}
+      R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL:-}
     ports:
       - "8080:8080"
     volumes:

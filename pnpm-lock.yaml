@@ -65,6 +65,12 @@ importers:
       '@markerit/validators':
         specifier: workspace:*
         version: link:../../packages/validators
+      cn:
+        specifier: ^0.5.2
+        version: 0.5.2
+      lucide-react:
+        specifier: ^1.68.0
+        version: 1.68.0(@types/react@19.3.0)(react@19.3.1)
       next:
         specifier: ^16.0.0
         version: 16.4.5(@babel/core@7.29.7)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)

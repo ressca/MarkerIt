@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@markerit/api-client';
 import { LoginForm } from './login-form';
 import { AuthShell } from '../components/auth-shell';
 
@@ -46,7 +47,6 @@ describe('LoginForm', () => {
 
   it('shows the localized invalid credentials response', async () => {
     const user = userEvent.setup();
-    const { ApiError } = await import('@markerit/api-client');
     loginAccount.mockRejectedValue(new ApiError(401, 'INVALID_CREDENTIALS', 'bad'));
     renderForm();
     await user.type(screen.getByLabelText('Adres e-mail'), 'user@example.com');
@@ -58,7 +58,6 @@ describe('LoginForm', () => {
 
   it('reopens email verification when a returning user has not verified yet', async () => {
     const user = userEvent.setup();
-    const { ApiError } = await import('@markerit/api-client');
     loginAccount.mockRejectedValue(new ApiError(403, 'EMAIL_NOT_VERIFIED', 'verify first'));
     renderForm();
     await user.type(screen.getByLabelText('Adres e-mail'), 'pending@example.com');
