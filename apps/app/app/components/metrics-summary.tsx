@@ -1,31 +1,35 @@
 'use client';
 
-import { Card, CardContent } from '@markerit/ui/components/card';
-import { Layers, MessageSquareDashed, Users2, ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { Card, CardContent, Badge } from '@markerit/ui';
+import { Layers, MessageSquare, Users2, CheckCircle2 } from 'lucide-react';
 import { cn } from 'cn';
 
 interface MetricsSummaryProps {
+  totalCount?: number;
   activeCount?: number;
-  totalLimit?: number;
+  closedCount?: number;
   openCommentsCount?: number;
   membersCount?: number;
   className?: string;
 }
 
 export function MetricsSummary({
-  activeCount = 3,
-  totalLimit = 5,
-  openCommentsCount = 6,
-  membersCount = 4,
+  totalCount = 0,
+  activeCount = 0,
+  closedCount = 0,
+  openCommentsCount = 0,
+  membersCount = 1,
   className,
 }: MetricsSummaryProps) {
+  const activeRate = totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0;
+
   const metrics = [
     {
       id: 'projects',
       label: 'Aktywne projekty',
       value: `${activeCount}`,
-      subtext: `z ${totalLimit}`,
-      trend: '+1 ten tydzień',
+      subtext: `z ${totalCount}`,
+      badge: `${activeRate}% całości`,
       icon: Layers,
       iconBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
     },
@@ -33,28 +37,28 @@ export function MetricsSummary({
       id: 'comments',
       label: 'Otwarte uwagi',
       value: `${openCommentsCount}`,
-      subtext: 'do przejrzenia',
-      trend: '2 priorytetowe',
-      icon: MessageSquareDashed,
+      subtext: openCommentsCount === 1 ? 'uwaga' : openCommentsCount >= 2 && openCommentsCount <= 4 ? 'uwagi' : 'uwag',
+      badge: openCommentsCount > 0 ? 'Wymaga uwagi' : 'Brak uwag',
+      icon: MessageSquare,
       iconBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    },
+    {
+      id: 'closed',
+      label: 'Zakończone projekty',
+      value: `${closedCount}`,
+      subtext: `z ${totalCount}`,
+      badge: closedCount > 0 ? 'Gotowe' : 'W trakcie',
+      icon: CheckCircle2,
+      iconBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
     },
     {
       id: 'members',
       label: 'Osoby w workspace',
       value: `${membersCount}`,
-      subtext: 'członków',
-      trend: 'Wszyscy aktywni',
+      subtext: membersCount === 1 ? 'właściciel' : 'członków',
+      badge: membersCount > 0 ? 'W zespole' : 'Brak',
       icon: Users2,
       iconBg: 'bg-primary/10 text-primary',
-    },
-    {
-      id: 'resolved',
-      label: 'Rozwiązane uwagi',
-      value: '24',
-      subtext: 'w tym miesiącu',
-      trend: 'Tempo 92%',
-      icon: CheckCircle2,
-      iconBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
     },
   ];
 
@@ -69,10 +73,10 @@ export function MetricsSummary({
           <Card
             key={item.id}
             size="sm"
-            className="group relative overflow-hidden transition-all duration-200 hover:shadow-md hover:border-primary/30"
+            className="group relative overflow-hidden transition-all duration-200 hover:border-primary/40 hover:shadow-sm"
           >
             <CardContent className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-3.5">
+              <div className="flex items-center gap-3">
                 <div
                   className={cn(
                     'flex size-10 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105',
@@ -93,12 +97,9 @@ export function MetricsSummary({
                   </div>
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-1">
-                <span className="flex items-center text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                  <ArrowUpRight className="size-3.5" />
-                </span>
-                <span className="text-[10px] text-muted-foreground">{item.trend}</span>
-              </div>
+              <Badge variant="secondary" className="text-[10px] font-medium">
+                {item.badge}
+              </Badge>
             </CardContent>
           </Card>
         );

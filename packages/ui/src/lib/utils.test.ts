@@ -3,6 +3,7 @@ import { cn } from './utils';
 
 describe('cn', () => {
   it('combines class names and resolves conflicting Tailwind utilities', () => {
-    expect(cn('px-2 text-sm', false && 'hidden', 'px-4')).toBe('text-sm px-4');
+    const hidden = false;
+    expect(cn('px-2 text-sm', hidden && 'hidden', 'px-4')).toBe('text-sm px-4');
   });
 });

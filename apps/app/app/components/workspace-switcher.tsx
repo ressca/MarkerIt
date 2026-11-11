@@ -1,47 +1,150 @@
 'use client';
 
 import { useState } from 'react';
-import { Popover, PopoverContent, PopoverTrigger } from '@markerit/ui';
-import { Button } from '@markerit/ui/components/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Button,
+  Separator,
+  Input,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from '@markerit/ui';
 import { Check, ChevronsUpDown, Plus } from 'lucide-react';
+import type { Workspace } from './types';
 import { cn } from 'cn';
 
-const workspaces = [
-  { id: 'sp', name: 'Studio Północ', role: 'Właściciel', initials: 'SP', active: true },
-  { id: 'po', name: 'Projekt osobisty', role: 'Darmowy', initials: 'PO', active: false },
-  { id: 'kf', name: 'Klient: Fashion Lab', role: 'Edytor', initials: 'KF', active: false },
-];
-
-export function WorkspaceSwitcher({
-  currentWorkspace = 'Studio Północ',
-  onSelectWorkspace,
-}: {
+interface WorkspaceSwitcherProps {
+  workspaces?: Workspace[];
   currentWorkspace?: string;
   onSelectWorkspace?: (workspace: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState(currentWorkspace);
+  onAddWorkspace?: (name: string) => void;
+  collapsed?: boolean;
+}
 
-  const activeWs = workspaces.find((w) => w.name === selected) || {
-    id: 'sp',
-    name: selected,
-    role: 'Workspace',
-    initials: selected.slice(0, 2).toUpperCase(),
+export function WorkspaceSwitcher({
+  workspaces = [],
+  currentWorkspace = 'Główna przestrzeń',
+  onSelectWorkspace,
+  onAddWorkspace,
+  collapsed = false,
+}: WorkspaceSwitcherProps) {
+  const [open, setOpen] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+  const [newWsName, setNewWsName] = useState('');
+
+  const list = workspaces.length > 0
+    ? workspaces
+    : [
+        {
+          id: 'ws-1',
+          name: currentWorkspace,
+          role: 'Właściciel',
+          initials: currentWorkspace.slice(0, 2).toUpperCase(),
+          isDefault: true,
+        },
+      ];
+
+  const activeWs = list.find((w) => w.name === currentWorkspace) || {
+    id: 'ws-curr',
+    name: currentWorkspace,
+    role: 'Właściciel',
+    initials: currentWorkspace.slice(0, 2).toUpperCase(),
   };
 
   function handleSelect(name: string) {
-    setSelected(name);
     onSelectWorkspace?.(name);
     setOpen(false);
+  }
+
+  function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newWsName.trim()) return;
+    onAddWorkspace?.(newWsName.trim());
+    onSelectWorkspace?.(newWsName.trim());
+    setNewWsName('');
+    setIsAdding(false);
+    setOpen(false);
+  }
+
+  if (collapsed) {
+    return (
+      <TooltipProvider>
+        <Popover open={open} onOpenChange={setOpen}>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <PopoverTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="size-10 rounded-lg bg-card/80"
+                      aria-label={`Przestrzeń: ${activeWs.name}`}
+                    />
+                  }
+                >
+                  <span className="font-bold text-xs text-primary">{activeWs.initials}</span>
+                </PopoverTrigger>
+              }
+            />
+            <TooltipContent side="right">
+              <p className="font-semibold">{activeWs.name}</p>
+              <p className="text-[10px] text-muted-foreground">{activeWs.role}</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <PopoverContent align="start" side="right" className="w-64 p-2 shadow-xl">
+            <div className="px-2 py-1.5 font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
+              Twoje przestrzenie robocze
+            </div>
+            <div className="flex flex-col gap-0.5">
+              {list.map((ws) => {
+                const isCurrent = ws.name === currentWorkspace;
+                return (
+                  <Button
+                    key={ws.id}
+                    type="button"
+                    variant="ghost"
+                    onClick={() => handleSelect(ws.name)}
+                    className={cn(
+                      'h-auto w-full items-center justify-between px-2.5 py-2 text-left text-xs',
+                      isCurrent
+                        ? 'bg-primary/10 font-semibold text-primary hover:bg-primary/15'
+                        : 'text-foreground'
+                    )}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex size-6 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground">
+                        {ws.initials}
+                      </span>
+                      <div>
+                        <span className="block truncate max-w-[140px]">{ws.name}</span>
+                        <span className="block text-[10px] text-muted-foreground">{ws.role}</span>
+                      </div>
+                    </div>
+                    {isCurrent && <Check className="size-3.5 shrink-0 text-primary" />}
+                  </Button>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </TooltipProvider>
+    );
   }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         render={
-          <button
+          <Button
             type="button"
-            className="flex w-full items-center justify-between gap-3 rounded-lg border border-border bg-card/60 p-2.5 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            variant="outline"
+            className="h-auto w-full items-center justify-between gap-3 bg-card/60 p-2.5 text-left"
             aria-label="Wybierz przestrzeń roboczą"
           />
         }
@@ -60,23 +163,24 @@ export function WorkspaceSwitcher({
         <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
       </PopoverTrigger>
 
-      <PopoverContent align="start" className="w-64 p-1.5 shadow-xl">
+      <PopoverContent align="start" className="w-64 p-2 shadow-xl">
         <div className="px-2 py-1.5 font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
           Przestrzenie robocze
         </div>
         <div className="flex flex-col gap-0.5">
-          {workspaces.map((ws) => {
-            const isCurrent = ws.name === selected;
+          {list.map((ws) => {
+            const isCurrent = ws.name === currentWorkspace;
             return (
-              <button
+              <Button
                 key={ws.id}
                 type="button"
+                variant="ghost"
                 onClick={() => handleSelect(ws.name)}
                 className={cn(
-                  'flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-xs transition-colors',
+                  'h-auto w-full items-center justify-between px-2.5 py-2 text-left text-xs',
                   isCurrent
-                    ? 'bg-primary/10 font-medium text-primary'
-                    : 'text-foreground hover:bg-muted'
+                    ? 'bg-primary/10 font-semibold text-primary hover:bg-primary/15'
+                    : 'text-foreground'
                 )}
               >
                 <div className="flex items-center gap-2.5">
@@ -84,27 +188,54 @@ export function WorkspaceSwitcher({
                     {ws.initials}
                   </span>
                   <div>
-                    <span className="block">{ws.name}</span>
+                    <span className="block truncate max-w-[140px]">{ws.name}</span>
                     <span className="block text-[10px] text-muted-foreground">{ws.role}</span>
                   </div>
                 </div>
                 {isCurrent && <Check className="size-3.5 shrink-0 text-primary" />}
-              </button>
+              </Button>
             );
           })}
         </div>
 
-        <div className="my-1.5 h-px bg-border" />
+        <Separator className="my-2" />
 
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start gap-2 text-xs text-muted-foreground hover:text-foreground"
-          onClick={() => setOpen(false)}
-        >
-          <Plus className="size-3.5" />
-          Nowa przestrzeń...
-        </Button>
+        {isAdding ? (
+          <form onSubmit={handleCreate} className="flex flex-col gap-2 p-1">
+            <Input
+              value={newWsName}
+              onChange={(e) => setNewWsName(e.target.value)}
+              placeholder="Nazwa nowej przestrzeni"
+              className="h-8 text-xs"
+              autoFocus
+            />
+            <div className="flex justify-end gap-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => setIsAdding(false)}
+              >
+                Anuluj
+              </Button>
+              <Button type="submit" size="sm" className="h-7 px-2.5 text-xs">
+                Dodaj
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => setIsAdding(true)}
+          >
+            <Plus className="size-3.5" />
+            Nowa przestrzeń...
+          </Button>
+        )}
       </PopoverContent>
     </Popover>
   );

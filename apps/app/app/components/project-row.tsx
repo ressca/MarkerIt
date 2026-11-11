@@ -4,7 +4,13 @@ import { useState } from 'react';
 import { Badge } from '@markerit/ui/components/badge';
 import { Button } from '@markerit/ui/components/button';
 import { Avatar, AvatarFallback, AvatarGroup } from '@markerit/ui/components/avatar';
-import { Popover, PopoverContent, PopoverTrigger } from '@markerit/ui';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@markerit/ui';
 import {
   MessageSquare,
   Clock,
@@ -14,6 +20,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import type { Project, ProjectStatus } from './types';
+import { formatProjectUpdated } from '../lib/format';
 import { cn } from 'cn';
 
 interface ProjectRowProps {
@@ -32,14 +39,12 @@ const toneBorders: Record<string, string> = {
 };
 
 export function ProjectRow({ project, onStatusChange, onDelete }: ProjectRowProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
     navigator.clipboard?.writeText?.(window.location.href);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    setMenuOpen(false);
   }
 
   const borderClass = toneBorders[project.tone] || toneBorders.sage;
@@ -119,12 +124,12 @@ export function ProjectRow({ project, onStatusChange, onDelete }: ProjectRowProp
         {/* Updated */}
         <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
           <Clock className="size-3" />
-          {project.updated}
+          {formatProjectUpdated(project)}
         </span>
 
         {/* Action Menu */}
-        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-          <PopoverTrigger
+        <DropdownMenu>
+          <DropdownMenuTrigger
             render={
               <Button
                 variant="ghost"
@@ -135,45 +140,34 @@ export function ProjectRow({ project, onStatusChange, onDelete }: ProjectRowProp
             }
           >
             <MoreVertical className="size-4" />
-          </PopoverTrigger>
+          </DropdownMenuTrigger>
 
-          <PopoverContent align="end" className="w-48 p-1.5 shadow-xl">
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground hover:bg-muted"
-            >
-              <Copy className="size-3.5 text-muted-foreground" />
+          <DropdownMenuContent className="w-48">
+            <DropdownMenuItem onClick={handleCopy}>
+              <Copy className="text-muted-foreground" />
               <span>{copied ? 'Skopiowano!' : 'Kopiuj link'}</span>
-            </button>
-            <button
-              type="button"
+            </DropdownMenuItem>
+            <DropdownMenuItem
               onClick={() => {
                 const next = project.status === 'W toku' ? 'Zamknięty' : 'W toku';
                 onStatusChange?.(project.id, next);
-                setMenuOpen(false);
               }}
-              className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground hover:bg-muted"
             >
-              <CheckCircle className="size-3.5 text-muted-foreground" />
+              <CheckCircle className="text-muted-foreground" />
               <span>
                 {project.status === 'W toku' ? 'Oznacz jako zakończony' : 'Wznów projekt'}
               </span>
-            </button>
-            <div className="my-1 h-px bg-border" />
-            <button
-              type="button"
-              onClick={() => {
-                onDelete?.(project.id);
-                setMenuOpen(false);
-              }}
-              className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10"
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => onDelete?.(project.id)}
+              className="text-destructive data-[highlighted]:bg-destructive/10"
             >
-              <Trash2 className="size-3.5" />
+              <Trash2 />
               <span>Usuń projekt</span>
-            </button>
-          </PopoverContent>
-        </Popover>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </article>
   );

@@ -16,9 +16,26 @@ export interface Project {
   status: ProjectStatus;
   count: number;
   tone: ProjectTone;
+  createdAt?: string;
   updated: string;
+  updatedAt?: string;
   members: ProjectMember[];
   isShared?: boolean;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  role: string;
+  initials: string;
+  isDefault?: boolean;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  displayName: string;
+  initials: string;
 }
 
 export type ViewMode = 'grid' | 'list';

@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@markerit/api-client';
 import { RegisterForm } from './register-form';
 import { AuthShell } from '../components/auth-shell';
 
@@ -49,7 +50,6 @@ describe('RegisterForm', () => {
 
   it('shows an existing-email error on the email field', async () => {
     const user = userEvent.setup();
-    const { ApiError } = await import('@markerit/api-client');
     registerAccount.mockRejectedValue(new ApiError(409, 'EMAIL_ALREADY_REGISTERED', 'duplicate'));
     renderForm();
     await user.type(screen.getByLabelText('Adres e-mail'), 'user@example.com');

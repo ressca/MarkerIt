@@ -5,7 +5,12 @@ import { Card, CardContent } from '@markerit/ui/components/card';
 import { Badge } from '@markerit/ui/components/badge';
 import { Button } from '@markerit/ui/components/button';
 import { Avatar, AvatarFallback, AvatarGroup } from '@markerit/ui/components/avatar';
-import { Popover, PopoverContent, PopoverTrigger } from '@markerit/ui';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@markerit/ui';
 import {
   MessageSquare,
   Clock,
@@ -15,6 +20,7 @@ import {
   MoreVertical,
 } from 'lucide-react';
 import type { Project, ProjectStatus } from './types';
+import { formatProjectUpdated } from '../lib/format';
 import { cn } from 'cn';
 
 interface ProjectCardProps {
@@ -33,14 +39,12 @@ const toneGradients: Record<string, string> = {
 };
 
 export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
     navigator.clipboard?.writeText?.(window.location.href);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    setMenuOpen(false);
   }
 
   const gradient = toneGradients[project.tone] || toneGradients.sage;
@@ -110,13 +114,13 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
                 {project.name}
               </h3>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {project.description || `${project.workspace} · Zespół projektu`}
+                {project.description || 'Brak opisu'}
               </p>
             </div>
 
-            {/* Menu Popover */}
-            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-              <PopoverTrigger
+            {/* Action menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
                 render={
                   <Button
                     variant="ghost"
@@ -127,45 +131,33 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
                 }
               >
                 <MoreVertical className="size-4" />
-              </PopoverTrigger>
+              </DropdownMenuTrigger>
 
-              <PopoverContent align="end" className="w-48 p-1.5 shadow-xl">
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground hover:bg-muted"
-                >
-                  <Copy className="size-3.5 text-muted-foreground" />
+              <DropdownMenuContent className="w-48">
+                <DropdownMenuItem onClick={handleCopy}>
+                  <Copy className="text-muted-foreground" />
                   <span>{copied ? 'Skopiowano!' : 'Kopiuj link do review'}</span>
-                </button>
-                <button
-                  type="button"
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   onClick={() => {
                     const next = project.status === 'W toku' ? 'Zamknięty' : 'W toku';
                     onStatusChange?.(project.id, next);
-                    setMenuOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground hover:bg-muted"
                 >
-                  <CheckCircle className="size-3.5 text-muted-foreground" />
+                  <CheckCircle className="text-muted-foreground" />
                   <span>
                     {project.status === 'W toku' ? 'Oznacz jako zakończony' : 'Wznów projekt'}
                   </span>
-                </button>
-                <div className="my-1 h-px bg-border" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    onDelete?.(project.id);
-                    setMenuOpen(false);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10"
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onDelete?.(project.id)}
+                  className="text-destructive data-[highlighted]:bg-destructive/10"
                 >
-                  <Trash2 className="size-3.5" />
+                  <Trash2 />
                   <span>Usuń projekt</span>
-                </button>
-              </PopoverContent>
-            </Popover>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -190,7 +182,7 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
 
           <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
             <Clock className="size-3" />
-            {project.updated}
+            {formatProjectUpdated(project)}
           </span>
         </div>
       </CardContent>

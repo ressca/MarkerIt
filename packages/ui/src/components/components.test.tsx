@@ -5,6 +5,9 @@ import { Badge } from './badge';
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './card';
 import { Input } from './input';
 import { Label } from './label';
+import { Separator } from './separator';
+import { Progress } from './progress';
+import { Skeleton } from './skeleton';
 import { Button as LegacyButton } from '../button';
 import { StatusBadge } from '../status-badge';
 import { ThemeToggle } from './theme-toggle';
@@ -59,5 +62,18 @@ describe('shared UI primitives', () => {
     screen.getByRole('button', { name: 'Light' }).click();
     expect(document.documentElement).not.toHaveClass('dark');
     expect(window.localStorage.getItem('markerit-theme')).toBe('light');
+  });
+
+  it('renders separator, progress and skeleton primitives with correct slots', () => {
+    render(
+      <div>
+        <Separator data-testid="sep" />
+        <Progress value={60} data-testid="prog" />
+        <Skeleton data-testid="skel" />
+      </div>
+    );
+    expect(screen.getByTestId('sep')).toHaveAttribute('data-slot', 'separator');
+    expect(screen.getByTestId('prog')).toHaveAttribute('data-slot', 'progress');
+    expect(screen.getByTestId('skel')).toHaveAttribute('data-slot', 'skeleton');
   });
 });

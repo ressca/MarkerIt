@@ -6,15 +6,32 @@ import {
   FolderKanban,
   Share2,
   Archive,
-  Users,
-  Settings,
   LogOut,
-  User,
+  PanelLeftClose,
+  PanelLeftOpen,
+  MessageSquare,
 } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@markerit/ui';
-import { Badge } from '@markerit/ui/components/badge';
-import { Avatar, AvatarFallback } from '@markerit/ui/components/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  Button,
+  Badge,
+  Avatar,
+  AvatarFallback,
+  Card,
+  CardContent,
+  Separator,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from '@markerit/ui';
 import { WorkspaceSwitcher } from './workspace-switcher';
+import type { Workspace, UserProfile } from './types';
 import { cn } from 'cn';
 
 interface SidebarProps {
@@ -22,21 +39,42 @@ interface SidebarProps {
   onTabChange?: (tab: string) => void;
   projectCount?: number;
   sharedCount?: number;
+  closedCount?: number;
+  commentsCount?: number;
+  workspaces?: Workspace[];
   currentWorkspace?: string;
   onWorkspaceChange?: (workspace: string) => void;
+  onAddWorkspace?: (name: string) => void;
+  user?: UserProfile | null;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
   className?: string;
 }
 
 export function Sidebar({
   activeTab = 'projekty',
   onTabChange,
-  projectCount = 3,
-  sharedCount = 1,
-  currentWorkspace = 'Studio Północ',
+  projectCount = 0,
+  sharedCount = 0,
+  closedCount = 0,
+  commentsCount = 0,
+  workspaces = [],
+  currentWorkspace = 'Moja przestrzeń',
   onWorkspaceChange,
+  onAddWorkspace,
+  user = null,
+  collapsed = false,
+  onToggleCollapse,
   className,
 }: SidebarProps) {
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const displayUser = user ?? {
+    id: 'guest',
+    email: '',
+    displayName: 'Niezalogowany',
+    initials: '—',
+  };
 
   const navItems = [
     {
@@ -51,87 +89,177 @@ export function Sidebar({
       label: 'Udostępnione',
       icon: Share2,
       count: sharedCount,
-      href: '#shared',
+      href: '#projekty',
     },
     {
       id: 'archive',
       label: 'Archiwum',
       icon: Archive,
-      href: '#archiwum',
-    },
-    {
-      id: 'team',
-      label: 'Zespół',
-      icon: Users,
-      href: '#zespol',
+      count: closedCount,
+      href: '#projekty',
     },
   ];
 
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Ignore network errors; the local session is still cleared below.
+    }
+    if (typeof window !== 'undefined') {
+      window.location.assign('/login');
+    }
+  }
+
   return (
-    <aside
-      className={cn(
-        'flex h-full flex-col border-r border-border bg-sidebar text-sidebar-foreground',
-        className
-      )}
-    >
-      {/* Top Wordmark */}
-      <div className="flex items-center justify-between px-5 pt-5 pb-4">
-        <Link
-          href="/"
-          className="flex items-center gap-1.5 font-extrabold text-xl tracking-tight text-foreground transition-opacity hover:opacity-90"
-          aria-label="markerIt Strona główna"
+    <TooltipProvider>
+      <aside
+        data-collapsed={collapsed}
+        className={cn(
+          'relative flex h-dvh flex-col border-r border-border bg-sidebar text-sidebar-foreground transition-[width] duration-300 ease-in-out select-none',
+          collapsed ? 'w-16 items-center' : 'w-64',
+          className
+        )}
+      >
+        {/* Top Header / Logo */}
+        <div
+          className={cn(
+            'flex h-16 shrink-0 items-center border-b border-border/50 px-4',
+            collapsed ? 'justify-center' : 'justify-between'
+          )}
         >
-          <span>marker</span>
-          <span className="text-primary">It</span>
-        </Link>
-        <Badge variant="outline" className="text-[10px] uppercase font-mono tracking-wider">
-          Beta
-        </Badge>
-      </div>
-
-      {/* Workspace Switcher */}
-      <div className="px-4 pb-3">
-        <WorkspaceSwitcher
-          currentWorkspace={currentWorkspace}
-          onSelectWorkspace={onWorkspaceChange}
-        />
-      </div>
-
-      {/* Navigation */}
-      <div className="flex-1 overflow-y-auto px-3 py-2">
-        <p className="px-3 pt-2 pb-1 font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
-          PRZESTRZEŃ ROBOCZA
-        </p>
-        <nav className="space-y-1" aria-label="Menu główne">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <a
-                key={item.id}
-                href={item.href}
-                onClick={() => {
-                  if (onTabChange) {
-                    onTabChange(item.id);
-                  }
-                }}
-                className={cn(
-                  'group flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-all duration-150',
-                  isActive
-                    ? 'bg-primary/10 text-primary font-semibold shadow-xs'
-                    : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                )}
+          {collapsed ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Link
+                    href="/"
+                    className="flex size-9 items-center justify-center rounded-lg bg-primary/10 font-extrabold text-sm text-primary"
+                    aria-label="markerIt"
+                  >
+                    m.
+                  </Link>
+                }
+              />
+              <TooltipContent side="right">markerIt</TooltipContent>
+            </Tooltip>
+          ) : (
+            <>
+              <Link
+                href="/"
+                className="flex items-center gap-1 font-extrabold text-lg tracking-tight text-foreground transition-opacity hover:opacity-90"
+                aria-label="markerIt Strona główna"
               >
-                <div className="flex items-center gap-2.5">
-                  <Icon
-                    className={cn(
-                      'size-4 transition-colors',
-                      isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
-                    )}
-                  />
-                  <span>{item.label}</span>
-                </div>
-                {typeof item.count === 'number' && (
+                <span>marker</span>
+                <span className="text-primary">It</span>
+              </Link>
+              <div className="flex items-center gap-1">
+                <Badge
+                  variant="outline"
+                  className="px-1.5 py-0 text-[10px] font-mono uppercase tracking-wider"
+                >
+                  Beta
+                </Badge>
+                {onToggleCollapse && (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={onToggleCollapse}
+                          className="size-7 text-muted-foreground hover:text-foreground"
+                          aria-label="Zwiń pasek boczny"
+                        >
+                          <PanelLeftClose className="size-4" />
+                        </Button>
+                      }
+                    />
+                    <TooltipContent side="right">Zwiń pasek boczny (Ctrl+B)</TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Workspace Switcher */}
+        <div className={cn('p-3', collapsed && 'p-2')}>
+          <WorkspaceSwitcher
+            workspaces={workspaces}
+            currentWorkspace={currentWorkspace}
+            onSelectWorkspace={onWorkspaceChange}
+            onAddWorkspace={onAddWorkspace}
+            collapsed={collapsed}
+          />
+        </div>
+
+        <Separator className="mx-auto w-[calc(100%-1.5rem)]" />
+
+        {/* Navigation list */}
+        <div className={cn('flex-1 overflow-y-auto px-3 py-3', collapsed && 'px-2')}>
+          {!collapsed && (
+            <p className="px-3 pt-1 pb-2 font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
+              PRZESTRZEŃ ROBOCZA
+            </p>
+          )}
+          <nav className="space-y-1" aria-label="Menu główne">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+
+              if (collapsed) {
+                return (
+                  <Tooltip key={item.id}>
+                    <TooltipTrigger
+                      render={
+                        <a
+                          href={item.href}
+                          onClick={() => onTabChange?.(item.id)}
+                          className={cn(
+                            'flex size-10 items-center justify-center rounded-lg transition-colors',
+                            isActive
+                              ? 'bg-primary/10 font-bold text-primary shadow-2xs'
+                              : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                          )}
+                          aria-label={item.label}
+                        >
+                          <Icon className="size-4" />
+                        </a>
+                      }
+                    />
+                    <TooltipContent side="right">
+                      {item.label} ({item.count})
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
+
+              return (
+                <a
+                  key={item.id}
+                  href={item.href}
+                  onClick={() => onTabChange?.(item.id)}
+                  className={cn(
+                    'group flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-all duration-150',
+                    isActive
+                      ? 'bg-primary/10 font-semibold text-primary shadow-2xs'
+                      : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  )}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Icon
+                      className={cn(
+                        'size-4 transition-colors',
+                        isActive
+                          ? 'text-primary'
+                          : 'text-muted-foreground group-hover:text-foreground'
+                      )}
+                    />
+                    <span>{item.label}</span>
+                  </div>
                   <Badge
                     variant={isActive ? 'default' : 'secondary'}
                     className={cn(
@@ -141,103 +269,149 @@ export function Sidebar({
                   >
                     {item.count}
                   </Badge>
+                </a>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Live workspace summary */}
+        {!collapsed && (
+          <div className="p-3">
+            <Card size="sm" className="border-border/80 bg-card/60 shadow-2xs">
+              <CardContent className="space-y-2 p-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                    <FolderKanban className="size-3.5" />
+                    Projekty
+                  </span>
+                  <strong className="text-sm font-semibold text-foreground">{projectCount}</strong>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                    <MessageSquare className="size-3.5" />
+                    Uwagi
+                  </span>
+                  <strong className="text-sm font-semibold text-foreground">{commentsCount}</strong>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        <Separator />
+
+        {/* User profile footer */}
+        <div className={cn('p-3', collapsed && 'p-2')}>
+          <DropdownMenu>
+            {collapsed ? (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="size-10 rounded-lg"
+                          aria-label={`Profil: ${displayUser.displayName}`}
+                        />
+                      }
+                    >
+                      <Avatar
+                        size="sm"
+                        className="bg-primary/15 font-bold text-xs text-primary"
+                      >
+                        <AvatarFallback>{displayUser.initials}</AvatarFallback>
+                      </Avatar>
+                    </DropdownMenuTrigger>
+                  }
+                />
+                <TooltipContent side="right">
+                  <p className="font-medium">{displayUser.displayName}</p>
+                  {displayUser.email && (
+                    <p className="text-[10px] text-muted-foreground">{displayUser.email}</p>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-auto w-full justify-start gap-2.5 p-2"
+                    aria-label="Menu profilu użytkownika"
+                  />
+                }
+              >
+                <Avatar size="sm" className="bg-primary/15 font-bold text-xs text-primary">
+                  <AvatarFallback>{displayUser.initials}</AvatarFallback>
+                </Avatar>
+                <span className="min-w-0 flex-1 text-left">
+                  <strong className="block truncate text-xs font-semibold text-foreground">
+                    {displayUser.displayName}
+                  </strong>
+                  {displayUser.email && (
+                    <small className="block truncate text-[11px] text-muted-foreground">
+                      {displayUser.email}
+                    </small>
+                  )}
+                </span>
+              </DropdownMenuTrigger>
+            )}
+
+            <DropdownMenuContent
+              align={collapsed ? 'start' : 'end'}
+              side={collapsed ? 'right' : 'top'}
+              className="w-56"
+            >
+              <DropdownMenuLabel>Zalogowano jako</DropdownMenuLabel>
+              <div className="px-2 pb-1.5">
+                <p className="truncate text-xs font-medium text-foreground">
+                  {displayUser.displayName}
+                </p>
+                {displayUser.email && (
+                  <p className="truncate text-[11px] text-muted-foreground">{displayUser.email}</p>
                 )}
-              </a>
-            );
-          })}
-        </nav>
-
-        <p className="px-3 pt-6 pb-1 font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
-          PREFERENCJE
-        </p>
-        <div className="space-y-1">
-          <a
-            href="#ustawienia"
-            className="group flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <Settings className="size-4 text-muted-foreground group-hover:text-foreground" />
-            <span>Ustawienia</span>
-          </a>
-        </div>
-      </div>
-
-      {/* Plan quota & storage widget */}
-      <div className="p-3">
-        <div className="rounded-xl border border-border/70 bg-card/60 p-3 text-xs shadow-2xs">
-          <div className="flex items-center justify-between font-medium text-[11px] text-muted-foreground">
-            <span>Pakiet Starter</span>
-            <span className="font-semibold text-foreground">3 / 5 proj.</span>
-          </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-            <div className="h-full w-3/5 rounded-full bg-primary" />
-          </div>
-          <p className="mt-2 text-[10px] text-muted-foreground">
-            Wykorzystano 60% limitu darmowych projektów.
-          </p>
-        </div>
-      </div>
-
-      {/* User profile footer */}
-      <div className="border-t border-border p-3">
-        <Popover open={profileOpen} onOpenChange={setProfileOpen}>
-          <PopoverTrigger
-            render={
-              <button
-                type="button"
-                className="flex w-full items-center justify-between rounded-lg p-2 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="Menu profilu użytkownika"
-              />
-            }
-          >
-            <div className="flex min-w-0 items-center gap-2.5">
-              <Avatar size="sm" className="bg-primary/15 text-primary font-bold text-xs">
-                <AvatarFallback>AK</AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <strong className="block truncate text-xs font-semibold text-foreground">
-                  Anna Kowalska
-                </strong>
-                <small className="block truncate text-[11px] text-muted-foreground">
-                  anna@studio.pl
-                </small>
               </div>
-            </div>
-            <span className="text-muted-foreground hover:text-foreground">···</span>
-          </PopoverTrigger>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={loggingOut}
+                onClick={handleLogout}
+                className="text-destructive data-[highlighted]:bg-destructive/10"
+              >
+                <LogOut />
+                <span>{loggingOut ? 'Wylogowywanie...' : 'Wyloguj się'}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-          <PopoverContent align="end" side="top" className="w-56 p-1.5 shadow-xl">
-            <div className="px-2.5 py-1.5">
-              <p className="font-medium text-xs text-foreground">Zalogowano jako</p>
-              <p className="truncate text-[11px] text-muted-foreground">anna@studio.pl</p>
+          {collapsed && onToggleCollapse && (
+            <div className="mt-2 flex justify-center">
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={onToggleCollapse}
+                      className="size-8 text-muted-foreground hover:text-foreground"
+                      aria-label="Rozwiń pasek boczny"
+                    >
+                      <PanelLeftOpen className="size-4" />
+                    </Button>
+                  }
+                />
+                <TooltipContent side="right">Rozwiń pasek boczny (Ctrl+B)</TooltipContent>
+              </Tooltip>
             </div>
-            <div className="my-1 h-px bg-border" />
-            <button
-              type="button"
-              onClick={() => setProfileOpen(false)}
-              className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground hover:bg-muted"
-            >
-              <User className="size-3.5 text-muted-foreground" />
-              <span>Twój profil</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setProfileOpen(false)}
-              className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground hover:bg-muted"
-            >
-              <Settings className="size-3.5 text-muted-foreground" />
-              <span>Ustawienia konta</span>
-            </button>
-            <div className="my-1 h-px bg-border" />
-            <a
-              href="/login"
-              className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10"
-            >
-              <LogOut className="size-3.5" />
-              <span>Wyloguj się</span>
-            </a>
-          </PopoverContent>
-        </Popover>
-      </div>
-    </aside>
+          )}
+        </div>
+      </aside>
+    </TooltipProvider>
   );
 }
