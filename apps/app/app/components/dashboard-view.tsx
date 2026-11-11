@@ -37,6 +37,7 @@ import {
 import { Sidebar } from './sidebar';
 import { DashboardHeader } from './dashboard-header';
 import { MetricsSummary } from './metrics-summary';
+import { LimitsSummary } from './limits-summary';
 import { ProjectCard } from './project-card';
 import { ProjectRow } from './project-row';
 import { NewProjectDialog, type NewProjectValues } from './new-project-dialog';
@@ -317,6 +318,11 @@ export function DashboardView({
     [workspaceProjects]
   );
 
+  const ownedWorkspaceCount = useMemo(
+    () => workspaces.filter((workspace) => workspace.role === 'Właściciel').length,
+    [workspaces]
+  );
+
   const membersCount = useMemo(() => {
     const members = new Set<string>();
     if (user?.displayName) members.add(user.displayName);
@@ -493,6 +499,14 @@ export function DashboardView({
                 closedCount={closedCount}
                 openCommentsCount={totalComments}
                 membersCount={membersCount}
+              />
+
+              {/* Hard limits: workspaces per account and projects per workspace */}
+              <LimitsSummary
+                projectCount={workspaceProjects.length}
+                maxProjects={MAX_PROJECTS}
+                workspaceCount={ownedWorkspaceCount}
+                maxWorkspaces={MAX_WORKSPACES}
               />
 
               {/* Toolbar: status tabs, sort, view mode */}

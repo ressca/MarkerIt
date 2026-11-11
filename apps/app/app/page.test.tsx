@@ -106,6 +106,15 @@ describe('DashboardView', () => {
     expect(within(summary).getByText('14')).toBeInTheDocument();
   });
 
+  it('shows namespace usage limits without metric badges', () => {
+    renderDashboard();
+
+    const limits = screen.getByRole('region', { name: 'Limity wykorzystania' });
+    expect(within(limits).getByText('3 / 3')).toBeInTheDocument();
+    expect(within(limits).getByText('1 / 3')).toBeInTheDocument();
+    expect(screen.queryByText(/% całości/)).not.toBeInTheDocument();
+  });
+
   it('shows an honest empty state instead of placeholder projects', () => {
     renderDashboard({ projects: [] });
 

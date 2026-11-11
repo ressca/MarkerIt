@@ -1,6 +1,6 @@
 'use client';
 
-import { Card, CardContent, Badge } from '@markerit/ui';
+import { Card, CardContent } from '@markerit/ui';
 import { Layers, MessageSquare, Users2, CheckCircle2 } from 'lucide-react';
 import { cn } from 'cn';
 
@@ -21,15 +21,12 @@ export function MetricsSummary({
   membersCount = 1,
   className,
 }: MetricsSummaryProps) {
-  const activeRate = totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0;
-
   const metrics = [
     {
       id: 'projects',
       label: 'Aktywne projekty',
       value: `${activeCount}`,
       subtext: `z ${totalCount}`,
-      badge: `${activeRate}% całości`,
       icon: Layers,
       iconBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
     },
@@ -38,7 +35,6 @@ export function MetricsSummary({
       label: 'Otwarte uwagi',
       value: `${openCommentsCount}`,
       subtext: openCommentsCount === 1 ? 'uwaga' : openCommentsCount >= 2 && openCommentsCount <= 4 ? 'uwagi' : 'uwag',
-      badge: openCommentsCount > 0 ? 'Wymaga uwagi' : 'Brak uwag',
       icon: MessageSquare,
       iconBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
     },
@@ -47,7 +43,6 @@ export function MetricsSummary({
       label: 'Zakończone projekty',
       value: `${closedCount}`,
       subtext: `z ${totalCount}`,
-      badge: closedCount > 0 ? 'Gotowe' : 'W trakcie',
       icon: CheckCircle2,
       iconBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
     },
@@ -56,7 +51,6 @@ export function MetricsSummary({
       label: 'Osoby w workspace',
       value: `${membersCount}`,
       subtext: membersCount === 1 ? 'właściciel' : 'członków',
-      badge: membersCount > 0 ? 'W zespole' : 'Brak',
       icon: Users2,
       iconBg: 'bg-primary/10 text-primary',
     },
@@ -97,9 +91,6 @@ export function MetricsSummary({
                   </div>
                 </div>
               </div>
-              <Badge variant="secondary" className="text-[10px] font-medium">
-                {item.badge}
-              </Badge>
             </CardContent>
           </Card>
         );
