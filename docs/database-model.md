@@ -81,6 +81,7 @@ erDiagram
 ```mermaid
 erDiagram
     projects ||--o{ reviews : "ma review"
+    projects ||--o{ assets : "ma zdjęcia"
     reviews ||--o{ review_versions : "ma wersje"
     review_versions ||--o{ review_version_assets : "zawiera pliki"
     assets ||--o{ review_version_assets : "jest użyty"
@@ -95,7 +96,10 @@ erDiagram
     assets {
         uuid id PK
         uuid workspace_id FK
+        uuid project_id FK
+        uuid owner_user_id FK
         uuid uploaded_by FK
+        varchar purpose
         varchar kind
         varchar storage_key
         varchar content_type
@@ -307,10 +311,13 @@ Bez zmian. Indeksy już istnieją.
 | Kolumna | Typ | Ograniczenia |
 | --- | --- | --- |
 | `id` | `UUID` | PK |
-| `workspace_id` | `UUID` | `NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE` |
+| `workspace_id` | `UUID` | `REFERENCES workspaces(id) ON DELETE CASCADE` (null dla awatara) |
+| `project_id` | `UUID` | `REFERENCES projects(id) ON DELETE CASCADE` (wymagane dla `REVIEW_IMAGE`) |
+| `owner_user_id` | `UUID` | `REFERENCES users(id) ON DELETE CASCADE` (wymagane dla `AVATAR`) |
 | `uploaded_by` | `UUID` | `REFERENCES users(id) ON DELETE SET NULL` |
+| `purpose` | `VARCHAR(20)` | `NOT NULL`, `CHECK (purpose IN ('REVIEW_IMAGE','AVATAR','ATTACHMENT'))` |
 | `kind` | `VARCHAR(20)` | `CHECK (kind IN ('IMAGE','PDF','VIDEO','OTHER'))` |
-| `storage_provider` | `VARCHAR(20)` | `NOT NULL DEFAULT 'local'`, `CHECK (storage_provider IN ('local','s3','r2'))` |
+| `storage_provider` | `VARCHAR(20)` | `NOT NULL DEFAULT 'R2'`, `CHECK (storage_provider IN ('R2','LOCAL'))` |
 | `storage_key` | `TEXT` | `NOT NULL` |
 | `original_name` | `TEXT` | `NOT NULL` |
 | `content_type` | `VARCHAR(255)` | `NOT NULL` |
@@ -318,13 +325,16 @@ Bez zmian. Indeksy już istnieją.
 | `checksum_sha256` | `CHAR(64)` |  |
 | `width` | `INTEGER` | `CHECK (width IS NULL OR width > 0)` |
 | `height` | `INTEGER` | `CHECK (height IS NULL OR height > 0)` |
-| `status` | `VARCHAR(20)` | `NOT NULL DEFAULT 'READY'`, `CHECK (status IN ('UPLOADING','READY','FAILED'))` |
+| `status` | `VARCHAR(20)` | `NOT NULL DEFAULT 'PENDING'`, `CHECK (status IN ('PENDING','READY','FAILED'))` |
 | `metadata` | `JSONB` | `NOT NULL DEFAULT '{}'` |
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT now()` |
 | `deleted_at` | `TIMESTAMPTZ` |  |
 
 - `UNIQUE (storage_provider, storage_key)`.
-- Indeks `(workspace_id, created_at DESC)`.
+- Indeks `(workspace_id, created_at DESC)` oraz `(project_id, created_at DESC)`.
+- Trigger `assets_enforce_project_limit`: maks. **8 zdjęć `REVIEW_IMAGE` na projekt**
+  (aktywne, nieusunięte). To limit zużycia R2, nie bazy.
+- Trigger sprawdza też, że `project_id` należy do tego samego workspace co asset.
 
 #### `asset_variants` (miniatury/preview — etap 2+)
 
@@ -374,7 +384,7 @@ Review = kontener na jedną rzecz do oceny (np. makieta, plakat, ekran) wraz z w
 
 - PK `(review_version_id, asset_id)`.
 - `UNIQUE (review_version_id, position)`.
-- Serwis waliduje, że `assets.workspace_id` = workspace projektu.
+- Trigger `review_version_assets_project_check` pilnuje, że asset i review należą do tego samego projektu oraz że asset ma `purpose = 'REVIEW_IMAGE'`.
 
 #### `review_pins`
 
@@ -563,8 +573,10 @@ Członek workspace'u widzi projekty `WORKSPACE`; projekt `PRIVATE` wymaga grantu
 8. **Rozszerzalność** — `settings`, `metadata`, `payload` jako `JSONB` tam, gdzie
    struktura może się zmieniać; reszta w kolumnach z `CHECK`.
 9. **Pliki w R2** — baza przechowuje tylko metadane i `storage_key`.
-10. **Twarde limity** — 3 przestrzenie, 3 projekty w przestrzeni, 8 review w projekcie;
-    egzekwowane w serwisie i triggerami PostgreSQL.
+10. **Twarde limity** — 3 przestrzenie, 3 projekty w przestrzeni, 8 zdjęć
+    `REVIEW_IMAGE` na projekt; egzekwowane w serwisie i triggerami PostgreSQL.
+    Liczba review, wersji, pinezek i komentarzy jest nieograniczona — limit dotyczy
+    wyłącznie miejsca w Cloudflare R2.
 
 ## 8. Wdrożone migracje
 
@@ -573,8 +585,9 @@ Wszystkie tabele powstają od razu (wariant „od razu”):
 | Migracja | Zakres |
 | --- | --- |
 | `V4__core_workspaces_projects.sql` | rozszerzenie `users`, `workspaces`, `workspace_members`, `projects`, `project_members`, `project_favorites`, `assets`, `asset_variants`, triggery limitów |
-| `V5__reviews_assets_pins.sql` | `reviews`, `review_versions`, `review_version_assets`, `review_pins`, `pin_comments`, mentions, reactions, approvals, `tags`, `project_tags`, trigger limitu 8 review |
+| `V5__reviews_assets_pins.sql` | `reviews`, `review_versions`, `review_version_assets`, `review_pins`, `pin_comments`, mentions, reactions, approvals, `tags`, `project_tags` |
 | `V6__collaboration_notifications.sql` | `workspace_invitations`, `project_invitations`, `share_links`, `share_link_sessions`, `notifications`, `notification_preferences`, `email_outbox`, `activity_events`, `audit_events` |
+| `V7__review_image_storage_limit.sql` | `assets.project_id`, limit 8 zdjęć na projekt, walidacja przynależności assetu do projektu |
 
 Billing i integracje (API keys, webhooks) są świadomie pominięte.
 
@@ -586,8 +599,8 @@ Limity są egzekwowane w serwisach oraz triggerami w bazie:
 | --- | --- | --- |
 | Przestrzenie robocze na użytkownika | 3 | `WorkspaceService` + trigger `workspaces_enforce_limit` |
 | Projekty w przestrzeni | 3 | `ProjectService` + trigger `projects_enforce_limit` |
-| Review (zdjęcia do review) w projekcie | 8 | trigger `reviews_enforce_limit` + walidacja w serwisie review (etap UI) |
-| Pinezki i komentarze | bez limitu | — |
+| Zdjęcia do review (`REVIEW_IMAGE`) w projekcie | 8 | trigger `assets_enforce_project_limit` + walidacja w serwisie uploadu |
+| Review, wersje, pinezki, komentarze | bez limitu | — (limit dotyczy tylko obiektów w R2) |
 
 ## 10. Przechowywanie plików
 
