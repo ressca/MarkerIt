@@ -69,6 +69,8 @@ export const messages = {
     project: {
       backToDashboard: 'Back to dashboard',
       projectLabel: 'Project',
+      breadcrumbProjects: 'Projects',
+      breadcrumbThread: 'Thread',
       loadError: 'Could not load the project.',
       retry: 'Try again',
       statusActive: 'In progress',
@@ -399,6 +401,8 @@ export const messages = {
     project: {
       backToDashboard: 'Wróć do projektów',
       projectLabel: 'Projekt',
+      breadcrumbProjects: 'Projekty',
+      breadcrumbThread: 'Wątek',
       loadError: 'Nie udało się wczytać projektu.',
       retry: 'Spróbuj ponownie',
       statusActive: 'W toku',

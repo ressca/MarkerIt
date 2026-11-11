@@ -76,6 +76,7 @@ import {
 } from 'lucide-react';
 import type { UserProfile } from '../../../../components/types';
 import { apiErrorMessage } from '../../../../lib/api-errors';
+import { AppShell } from '../../../../components/app-shell';
 import { useAppLocale } from '../../../../lib/use-app-locale';
 import { assetContentUrl } from '../../../../lib/assets';
 import {
@@ -762,20 +763,43 @@ export function ReviewThreadPage({
     }
   }
 
+  const breadcrumbs = [
+    { label: messages.project.breadcrumbProjects, href: '/' },
+    {
+      label: project?.name ?? messages.project.projectLabel,
+      href: `/projects/${projectId}`,
+    },
+    { label: summary?.title ?? messages.project.breadcrumbThread },
+  ];
+
   if (loading && !thread) {
-    return <ThreadSkeleton messages={messages} />;
+    return (
+      <AppShell
+        user={initialUser}
+        workspaceId={project?.workspaceId}
+        breadcrumbs={breadcrumbs}
+      >
+        <ThreadSkeleton messages={messages} />
+      </AppShell>
+    );
   }
 
   if (!thread || !summary) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-3xl flex-col items-center justify-center px-6 text-center">
-        <h1 className="text-xl font-semibold text-foreground">{messages.project.loadError}</h1>
-        {errorMessage && <p className="mt-2 text-sm text-muted-foreground">{errorMessage}</p>}
-        <Button type="button" className="mt-4 gap-1.5" onClick={() => void load()}>
-          <RefreshCw className="size-4" />
-          {messages.project.retry}
-        </Button>
-      </div>
+      <AppShell
+        user={initialUser}
+        workspaceId={project?.workspaceId}
+        breadcrumbs={breadcrumbs}
+      >
+        <div className="mx-auto flex min-h-[60dvh] max-w-3xl flex-col items-center justify-center px-6 text-center">
+          <h1 className="text-xl font-semibold text-foreground">{messages.project.loadError}</h1>
+          {errorMessage && <p className="mt-2 text-sm text-muted-foreground">{errorMessage}</p>}
+          <Button type="button" className="mt-4 gap-1.5" onClick={() => void load()}>
+            <RefreshCw className="size-4" />
+            {messages.project.retry}
+          </Button>
+        </div>
+      </AppShell>
     );
   }
 
@@ -786,8 +810,8 @@ export function ReviewThreadPage({
     discussion && discussion.versionId === selectedVersion?.id ? discussion : null;
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 pb-16 sm:px-8">
+    <AppShell user={initialUser} workspaceId={project?.workspaceId} breadcrumbs={breadcrumbs}>
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 pb-16 sm:px-8">
         <Button
           variant="ghost"
           size="sm"
@@ -1059,7 +1083,6 @@ export function ReviewThreadPage({
             />
           </div>
         </section>
-      </main>
 
       <AddPinDialog
         open={pinPoint !== null}
@@ -1107,7 +1130,8 @@ export function ReviewThreadPage({
         messages={messages}
         onDelete={handleDelete}
       />
-    </div>
+      </div>
+    </AppShell>
   );
 }
 

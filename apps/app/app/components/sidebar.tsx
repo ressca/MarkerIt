@@ -7,8 +7,6 @@ import {
   Share2,
   Archive,
   LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
   MessageSquare,
 } from 'lucide-react';
 import {
@@ -48,7 +46,6 @@ interface SidebarProps {
   onAddWorkspace?: (name: string) => void;
   user?: UserProfile | null;
   collapsed?: boolean;
-  onToggleCollapse?: () => void;
   className?: string;
 }
 
@@ -65,7 +62,6 @@ export function Sidebar({
   onAddWorkspace,
   user = null,
   collapsed = false,
-  onToggleCollapse,
   className,
 }: SidebarProps) {
   const [loggingOut, setLoggingOut] = useState(false);
@@ -166,33 +162,12 @@ export function Sidebar({
                 <span>marker</span>
                 <span className="text-primary">It</span>
               </Link>
-              <div className="flex items-center gap-1">
-                <Badge
-                  variant="outline"
-                  className="px-1.5 py-0 text-[10px] font-mono uppercase tracking-wider"
-                >
-                  Beta
-                </Badge>
-                {onToggleCollapse && (
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={onToggleCollapse}
-                          className="size-7 text-muted-foreground hover:text-foreground"
-                          aria-label="Zwiń pasek boczny"
-                        >
-                          <PanelLeftClose className="size-4" />
-                        </Button>
-                      }
-                    />
-                    <TooltipContent side="right">Zwiń pasek boczny (Ctrl+B)</TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
+              <Badge
+                variant="outline"
+                className="px-1.5 py-0 text-[10px] font-mono uppercase tracking-wider"
+              >
+                Beta
+              </Badge>
             </>
           )}
         </div>
@@ -400,28 +375,6 @@ export function Sidebar({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {collapsed && onToggleCollapse && (
-            <div className="mt-2 flex justify-center">
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={onToggleCollapse}
-                      className="size-8 text-muted-foreground hover:text-foreground"
-                      aria-label="Rozwiń pasek boczny"
-                    >
-                      <PanelLeftOpen className="size-4" />
-                    </Button>
-                  }
-                />
-                <TooltipContent side="right">Rozwiń pasek boczny (Ctrl+B)</TooltipContent>
-              </Tooltip>
-            </div>
-          )}
         </div>
       </aside>
     </TooltipProvider>

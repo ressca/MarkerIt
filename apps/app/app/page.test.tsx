@@ -213,14 +213,16 @@ describe('DashboardView', () => {
     expect(sidebar).toHaveAttribute('data-collapsed', 'false');
     expect(sidebar).toHaveClass('h-dvh');
 
-    await testUser.click(
-      within(sidebar as HTMLElement).getByRole('button', { name: 'Zwiń pasek boczny' })
-    );
+    // The only sidebar toggle lives in the page header; the sidebar itself
+    // must not duplicate it.
+    expect(
+      within(sidebar as HTMLElement).queryByRole('button', { name: /pasek boczny/i })
+    ).not.toBeInTheDocument();
+
+    await testUser.click(screen.getByRole('button', { name: 'Zwiń pasek boczny' }));
     expect(sidebar).toHaveAttribute('data-collapsed', 'true');
 
-    await testUser.click(
-      within(sidebar as HTMLElement).getByRole('button', { name: 'Rozwiń pasek boczny' })
-    );
+    await testUser.click(screen.getByRole('button', { name: 'Rozwiń pasek boczny' }));
     expect(sidebar).toHaveAttribute('data-collapsed', 'false');
   });
 

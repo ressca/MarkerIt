@@ -50,6 +50,7 @@ import { useAppLocale } from '../../lib/use-app-locale';
 import { assetContentUrl } from '../../lib/assets';
 import { MAX_PHOTO_BYTES, MAX_PROJECT_PHOTOS } from '../../lib/project-constants';
 import { projectStatusLabel, projectToneLabel } from '../../lib/project-labels';
+import { AppShell } from '../../components/app-shell';
 import { CreateReviewDialog } from './components/create-review-dialog';
 import { ReviewThreadCard } from './components/review-thread-card';
 import { cn } from 'cn';
@@ -160,21 +161,31 @@ export function ProjectPage({
   const errorMessage = error
     ? apiErrorMessage(error, messages, messages.project.loadError)
     : null;
+  const breadcrumbs = [
+    { label: messages.project.breadcrumbProjects, href: '/' },
+    { label: project?.name ?? messages.project.projectLabel },
+  ];
 
   if (loading && !project) {
-    return <ProjectPageSkeleton messages={messages} />;
+    return (
+      <AppShell user={initialUser} breadcrumbs={breadcrumbs}>
+        <ProjectPageSkeleton messages={messages} />
+      </AppShell>
+    );
   }
 
   if (!project) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-3xl flex-col items-center justify-center px-6 text-center">
-        <h1 className="text-xl font-semibold text-foreground">{messages.project.loadError}</h1>
-        {errorMessage && <p className="mt-2 text-sm text-muted-foreground">{errorMessage}</p>}
-        <Button type="button" className="mt-4 gap-1.5" onClick={() => void load()}>
-          <RefreshCw className="size-4" />
-          {messages.project.retry}
-        </Button>
-      </div>
+      <AppShell user={initialUser} breadcrumbs={breadcrumbs}>
+        <div className="mx-auto flex min-h-[60dvh] max-w-3xl flex-col items-center justify-center px-6 text-center">
+          <h1 className="text-xl font-semibold text-foreground">{messages.project.loadError}</h1>
+          {errorMessage && <p className="mt-2 text-sm text-muted-foreground">{errorMessage}</p>}
+          <Button type="button" className="mt-4 gap-1.5" onClick={() => void load()}>
+            <RefreshCw className="size-4" />
+            {messages.project.retry}
+          </Button>
+        </div>
+      </AppShell>
     );
   }
 
@@ -185,8 +196,8 @@ export function ProjectPage({
   const canWrite = Boolean(currentMember && currentMember.role !== 'VIEWER');
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
-      <main className="mx-auto max-w-6xl space-y-8 px-4 py-6 pb-16 sm:px-8">
+    <AppShell user={initialUser} workspaceId={project.workspaceId} breadcrumbs={breadcrumbs}>
+      <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 pb-16 sm:px-8">
         <div>
           <Button
             variant="ghost"
@@ -439,7 +450,6 @@ export function ProjectPage({
             </div>
           )}
         </section>
-      </main>
 
       <CreateReviewDialog
         open={createOpen}
@@ -466,7 +476,8 @@ export function ProjectPage({
         messages={messages}
         onDelete={handleDeletePhoto}
       />
-    </div>
+      </div>
+    </AppShell>
   );
 }
 

@@ -28,6 +28,10 @@ vi.mock('@markerit/api-client', async (importOriginal) => {
   return { ...actual, ...api };
 });
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+}));
+
 const user: UserProfile = {
   id: 'user-1',
   email: 'anna@example.com',

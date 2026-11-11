@@ -303,7 +303,8 @@ describe('ReviewThreadPage', () => {
     );
     expect(await screen.findByTestId('discussion-panel')).toBeInTheDocument();
     expect(api.getReviewDiscussion).toHaveBeenCalledWith('review-1', 'version-2');
-    expect(screen.getByText('Kampania wiosenna').closest('a')).toHaveAttribute(
+    const breadcrumb = screen.getByRole('navigation', { name: 'Nawigacja okruszkowa' });
+    expect(within(breadcrumb).getByText('Kampania wiosenna').closest('a')).toHaveAttribute(
       'href',
       '/projects/project-1',
     );
