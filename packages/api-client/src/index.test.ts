@@ -3,10 +3,19 @@ import {
   ApiError,
   apiRequest,
   createPinComment,
+  createProject,
   createReviewPin,
+  createWorkspace,
+  deleteProject,
+  deleteWorkspace,
+  getWorkspace,
+  listProjects,
+  listWorkspaces,
   loginAccount,
   registerAccount,
   resendVerification,
+  updateProject,
+  updateWorkspace,
   verifyEmail,
 } from './index';
 
@@ -117,5 +126,56 @@ describe('auth and review API operations', () => {
     expect(fetchMock.mock.calls[0][0]).toContain('reviews/review%2Fid/pins');
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ xPercent: 20, yPercent: 30, body: 'Note' });
     expect(fetchMock.mock.calls[1][0]).toContain('pins/pin%20id/comments');
+  });
+});
+
+describe('dashboard API operations', () => {
+  const csrf = () => json({ token: 'csrf-token' });
+
+  it('lists and reads workspaces and projects', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json([{ id: 'ws-1' }]))
+      .mockResolvedValueOnce(json({ id: 'ws-1' }))
+      .mockResolvedValueOnce(json([{ id: 'p-1' }]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(listWorkspaces()).resolves.toEqual([{ id: 'ws-1' }]);
+    await expect(getWorkspace('ws/1')).resolves.toEqual({ id: 'ws-1' });
+    await expect(listProjects('ws 1')).resolves.toEqual([{ id: 'p-1' }]);
+
+    expect(fetchMock.mock.calls[0][0]).toContain('/workspaces');
+    expect(fetchMock.mock.calls[1][0]).toContain('/workspaces/ws%2F1');
+    expect(fetchMock.mock.calls[2][0]).toContain('/workspaces/ws%201/projects');
+  });
+
+  it('sends CSRF-protected workspace and project mutations', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json({ id: 'ws-1' }, 201))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json({ id: 'ws-1' }))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json({ id: 'p-1' }, 201))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json({ id: 'p-1' }))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createWorkspace({ name: 'Studio' });
+    await updateWorkspace('ws-1', { name: 'Nowe' });
+    await deleteWorkspace('ws-1');
+    await createProject('ws-1', { name: 'Projekt', tone: 'sage' });
+    await updateProject('p-1', { status: 'CLOSED' });
+    await deleteProject('p-1');
+
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ name: 'Studio' });
+    expect(fetchMock.mock.calls[3][1].method).toBe('PATCH');
+    expect(fetchMock.mock.calls[5][1].method).toBe('DELETE');
+    expect(JSON.parse(fetchMock.mock.calls[7][1].body)).toEqual({ name: 'Projekt', tone: 'sage' });
+    expect(JSON.parse(fetchMock.mock.calls[9][1].body)).toEqual({ status: 'CLOSED' });
+    expect(fetchMock.mock.calls.every((call, index) => index % 2 === 1 || call[0].includes('/auth/csrf'))).toBe(true);
   });
 });

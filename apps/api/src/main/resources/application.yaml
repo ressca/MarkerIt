@@ -28,3 +28,11 @@ app:
     from: ${EMAIL_FROM:noreply@markerit.local}
     resend-api-key: ${RESEND_API_KEY:}
     resend-api-url: ${RESEND_API_URL:https://api.resend.com/emails}
+  storage:
+    provider: ${STORAGE_PROVIDER:R2}
+    r2:
+      account-id: ${R2_ACCOUNT_ID:}
+      access-key-id: ${R2_ACCESS_KEY_ID:}
+      secret-access-key: ${R2_SECRET_ACCESS_KEY:}
+      bucket: ${R2_BUCKET:markerit}
+      public-base-url: ${R2_PUBLIC_BASE_URL:}

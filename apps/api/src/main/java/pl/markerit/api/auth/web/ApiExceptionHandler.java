@@ -15,6 +15,10 @@ import pl.markerit.api.auth.InvalidCredentialsException;
 import pl.markerit.api.auth.EmailNotVerifiedException;
 import pl.markerit.api.auth.PasswordPolicyException;
 import pl.markerit.api.auth.verification.VerificationException;
+import pl.markerit.api.common.ForbiddenAccessException;
+import pl.markerit.api.common.InvalidRequestException;
+import pl.markerit.api.common.LimitReachedException;
+import pl.markerit.api.common.ResourceNotFoundException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -84,6 +88,30 @@ public class ApiExceptionHandler {
         problem.setProperty("fieldErrors", List.of(Map.of(
                 "field", "password", "code", "password_length", "message", exception.getMessage())));
         return ResponseEntity.badRequest().body(problem);
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    ResponseEntity<ProblemDetail> notFound(ResourceNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(problem(HttpStatus.NOT_FOUND, exception.getCode(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(ForbiddenAccessException.class)
+    ResponseEntity<ProblemDetail> forbidden(ForbiddenAccessException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(problem(HttpStatus.FORBIDDEN, exception.getCode(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(LimitReachedException.class)
+    ResponseEntity<ProblemDetail> limitReached(LimitReachedException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(problem(HttpStatus.CONFLICT, exception.getCode(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidRequestException.class)
+    ResponseEntity<ProblemDetail> invalidRequest(InvalidRequestException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(problem(HttpStatus.BAD_REQUEST, exception.getCode(), exception.getMessage()));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

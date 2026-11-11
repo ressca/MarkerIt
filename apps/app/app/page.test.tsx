@@ -1,8 +1,18 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardView } from './components/dashboard-view';
 import type { Project, UserProfile, Workspace } from './components/types';
+
+const { createProjectMock } = vi.hoisted(() => ({ createProjectMock: vi.fn() }));
+
+vi.mock('@markerit/api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@markerit/api-client')>();
+  return {
+    ...actual,
+    createProject: createProjectMock,
+  };
+});
 
 const user: UserProfile = {
   id: 'user-1',
@@ -17,11 +27,13 @@ const workspace: Workspace = {
   role: 'Właściciel',
   initials: 'MP',
   isDefault: true,
+  projectCount: 3,
 };
 
 const projects: Project[] = [
   {
     id: 'proj-1',
+    workspaceId: workspace.id,
     name: 'Kampania — wiosna',
     description: 'Projekty bannerów, materiałów drukowanych i social media.',
     workspace: workspace.name,
@@ -34,6 +46,7 @@ const projects: Project[] = [
   },
   {
     id: 'proj-2',
+    workspaceId: workspace.id,
     name: 'Opakowanie produktu',
     description: 'Etykieta oraz pudełko linii kosmetyków organicznych.',
     workspace: workspace.name,
@@ -46,6 +59,7 @@ const projects: Project[] = [
   },
   {
     id: 'proj-3',
+    workspaceId: workspace.id,
     name: 'Identyfikacja wizualna',
     description: 'Księga znaku, typografia, paleta barw i wzorce.',
     workspace: workspace.name,
@@ -72,6 +86,7 @@ describe('DashboardView', () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
+    createProjectMock.mockReset();
   });
 
   it('renders the authenticated user, real counts and the project list', () => {
@@ -182,19 +197,40 @@ describe('DashboardView', () => {
     expect(sidebar).toHaveAttribute('data-collapsed', 'false');
   });
 
-  it('allows creating a new project via the dialog modal', async () => {
+  it('creates a project through the API-backed dialog', async () => {
     const testUser = userEvent.setup();
-    renderDashboard();
+    createProjectMock.mockResolvedValue({
+      id: 'proj-new',
+      workspaceId: workspace.id,
+      name: 'Projekt testowy 2026',
+      description: null,
+      status: 'ACTIVE',
+      tone: 'sage',
+      createdBy: user.id,
+      createdByName: user.displayName,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      openComments: 0,
+      members: [{ id: user.id, displayName: user.displayName, initials: user.initials }],
+    });
+
+    renderDashboard({ projects: [] });
 
     const openButtons = screen.getAllByRole('button', { name: /Nowy projekt/i });
     await testUser.click(openButtons[0]);
 
     expect(screen.getByRole('heading', { name: 'Utwórz nowy projekt' })).toBeInTheDocument();
+    expect(screen.getAllByText(/Moja przestrzeń/).length).toBeGreaterThan(0);
 
     await testUser.type(screen.getByLabelText(/Nazwa projektu/i), 'Projekt testowy 2026');
     await testUser.click(screen.getByRole('button', { name: 'Utwórz projekt' }));
 
     await waitFor(() => {
+      expect(createProjectMock).toHaveBeenCalledWith(workspace.id, {
+        name: 'Projekt testowy 2026',
+        description: undefined,
+        tone: 'sage',
+      });
       expect(screen.getByText('Projekt testowy 2026')).toBeInTheDocument();
     });
   });

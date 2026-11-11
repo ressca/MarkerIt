@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,15 +17,20 @@ import {
   TooltipProvider,
 } from '@markerit/ui';
 import { projectNameSchema } from '@markerit/validators';
-import type { Project, ProjectTone, UserProfile } from './types';
+import type { ProjectTone } from './types';
 import { cn } from 'cn';
+
+export interface NewProjectValues {
+  name: string;
+  description?: string;
+  tone: ProjectTone;
+}
 
 interface NewProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  defaultWorkspace?: string;
-  user?: UserProfile | null;
-  onCreateProject: (project: Omit<Project, 'id' | 'updated'>) => void;
+  workspaceName?: string;
+  onCreateProject: (values: NewProjectValues) => Promise<boolean>;
 }
 
 const colorTones: { id: ProjectTone; label: string; bg: string }[] = [
@@ -40,24 +45,23 @@ const colorTones: { id: ProjectTone; label: string; bg: string }[] = [
 export function NewProjectDialog({
   open,
   onOpenChange,
-  defaultWorkspace = 'Główna przestrzeń',
-  user = null,
+  workspaceName = 'Moja przestrzeń',
   onCreateProject,
 }: NewProjectDialogProps) {
   const [name, setName] = useState('');
-  const [workspace, setWorkspace] = useState(defaultWorkspace);
   const [description, setDescription] = useState('');
   const [tone, setTone] = useState<ProjectTone>('sage');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (open) {
-      setWorkspace(defaultWorkspace);
-      setError('');
-    }
-  }, [open, defaultWorkspace]);
+  function reset() {
+    setName('');
+    setDescription('');
+    setTone('sage');
+    setError('');
+  }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const result = projectNameSchema.safeParse(name);
     if (!result.success) {
@@ -65,24 +69,22 @@ export function NewProjectDialog({
       return;
     }
 
-    const memberName = user?.displayName || 'Właściciel';
-    const memberInitials = user?.initials || 'TY';
-
-    onCreateProject({
-      name: result.data,
-      workspace: workspace.trim() || defaultWorkspace,
-      description: description.trim() || undefined,
-      tone,
-      status: 'W toku',
-      count: 0,
-      members: [{ name: memberName, initials: memberInitials }],
-    });
-
-    setName('');
-    setDescription('');
-    setTone('sage');
-    setError('');
-    onOpenChange(false);
+    setSubmitting(true);
+    try {
+      const created = await onCreateProject({
+        name: result.data,
+        description: description.trim() || undefined,
+        tone,
+      });
+      if (!created) {
+        setError('Nie udało się utworzyć projektu. Spróbuj ponownie.');
+        return;
+      }
+      reset();
+      onOpenChange(false);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -93,7 +95,8 @@ export function NewProjectDialog({
             <DialogHeader>
               <DialogTitle>Utwórz nowy projekt</DialogTitle>
               <DialogDescription>
-                Stwórz projekt, dodaj pliki wizualne i zacznij zbierać precyzyjny feedback z zespołem.
+                Projekt zostanie dodany do przestrzeni „{workspaceName}”. Później dodasz zdjęcia do
+                review i zaczniesz zbierać uwagi.
               </DialogDescription>
             </DialogHeader>
 
@@ -111,16 +114,6 @@ export function NewProjectDialog({
                   autoFocus
                 />
                 {error && <p className="text-xs text-destructive">{error}</p>}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="project-workspace">Przestrzeń robocza</Label>
-                <Input
-                  id="project-workspace"
-                  value={workspace}
-                  onChange={(e) => setWorkspace(e.target.value)}
-                  placeholder="Główna przestrzeń"
-                />
               </div>
 
               <div className="space-y-1.5">
@@ -172,8 +165,8 @@ export function NewProjectDialog({
               >
                 Anuluj
               </Button>
-              <Button type="submit" size="sm">
-                Utwórz projekt
+              <Button type="submit" size="sm" disabled={submitting}>
+                {submitting ? 'Tworzenie...' : 'Utwórz projekt'}
               </Button>
             </DialogFooter>
           </form>

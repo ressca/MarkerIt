@@ -18,11 +18,23 @@ public class User {
     @Column(nullable = false, length = 320, unique = true)
     private String email;
 
+    @Column(name = "display_name", nullable = false, length = 80)
+    private String displayName;
+
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
     @Column(name = "email_verified", nullable = false)
     private boolean emailVerified;
+
+    @Column(nullable = false, length = 10)
+    private String locale;
+
+    @Column(name = "avatar_asset_id")
+    private UUID avatarAssetId;
+
+    @Column(name = "last_seen_at")
+    private Instant lastSeenAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -30,13 +42,18 @@ public class User {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     protected User() {
     }
 
     User(String email, String passwordHash) {
         this.id = UUID.randomUUID();
         this.email = email;
+        this.displayName = displayNameFrom(email);
         this.passwordHash = passwordHash;
+        this.locale = "pl";
     }
 
     @PrePersist
@@ -44,6 +61,17 @@ public class User {
         Instant now = Instant.now();
         this.createdAt = now;
         this.updatedAt = now;
+        if (this.displayName == null || this.displayName.isBlank()) {
+            this.displayName = displayNameFrom(email);
+        }
+        if (this.locale == null) {
+            this.locale = "pl";
+        }
+    }
+
+    private static String displayNameFrom(String email) {
+        String localPart = email == null ? "" : email.split("@", 2)[0];
+        return localPart.isBlank() ? "Użytkownik" : localPart;
     }
 
     public UUID getId() {
@@ -54,6 +82,10 @@ public class User {
         return email;
     }
 
+    public String getDisplayName() {
+        return displayName;
+    }
+
     String getPasswordHash() {
         return passwordHash;
     }
@@ -62,11 +94,52 @@ public class User {
         return createdAt;
     }
 
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
     public boolean isEmailVerified() {
         return emailVerified;
     }
 
+    public UUID getAvatarAssetId() {
+        return avatarAssetId;
+    }
+
+    public String getLocale() {
+        return locale;
+    }
+
+    public Instant getLastSeenAt() {
+        return lastSeenAt;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
     public void verifyEmail() {
         this.emailVerified = true;
+    }
+
+    public void touchLastSeen() {
+        this.lastSeenAt = Instant.now();
+        this.updatedAt = this.lastSeenAt;
+    }
+
+    public void updateProfile(String displayName, String locale, UUID avatarAssetId) {
+        if (displayName != null && !displayName.isBlank()) {
+            this.displayName = displayName.trim();
+        }
+        if (locale != null && !locale.isBlank()) {
+            this.locale = locale.trim();
+        }
+        this.avatarAssetId = avatarAssetId;
+        this.updatedAt = Instant.now();
+    }
+
+    public void softDelete() {
+        this.deletedAt = Instant.now();
+        this.updatedAt = this.deletedAt;
     }
 }

@@ -9,8 +9,14 @@ import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import pl.markerit.api.auth.EmailAlreadyRegisteredException;
+import pl.markerit.api.auth.EmailNotVerifiedException;
 import pl.markerit.api.auth.InvalidCredentialsException;
 import pl.markerit.api.auth.PasswordPolicyException;
+import pl.markerit.api.auth.verification.VerificationException;
+import pl.markerit.api.common.ForbiddenAccessException;
+import pl.markerit.api.common.InvalidRequestException;
+import pl.markerit.api.common.LimitReachedException;
+import pl.markerit.api.common.ResourceNotFoundException;
 
 class ApiExceptionHandlerTest {
     private final ApiExceptionHandler handler = new ApiExceptionHandler();
@@ -34,5 +40,41 @@ class ApiExceptionHandlerTest {
         var password = handler.passwordPolicy(new PasswordPolicyException("The password is invalid."));
         assertEquals(400, password.getStatusCode().value());
         assertEquals("The password is invalid.", ((Map<?, ?>)((java.util.List<?>)password.getBody().getProperties().get("fieldErrors")).getFirst()).get("message"));
+    }
+
+    @Test void mapsNewWorkspaceAndProjectErrors() {
+        var notFound = handler.notFound(new ResourceNotFoundException("PROJECT_NOT_FOUND", "Brak projektu."));
+        assertEquals(404, notFound.getStatusCode().value());
+        assertEquals("PROJECT_NOT_FOUND", notFound.getBody().getProperties().get("code"));
+        assertEquals("Brak projektu.", notFound.getBody().getDetail());
+
+        var forbidden = handler.forbidden(new ForbiddenAccessException("WORKSPACE_FORBIDDEN", "Brak dostępu."));
+        assertEquals(403, forbidden.getStatusCode().value());
+        assertEquals("WORKSPACE_FORBIDDEN", forbidden.getBody().getProperties().get("code"));
+
+        var limit = handler.limitReached(new LimitReachedException("PROJECT_LIMIT_REACHED", "Limit."));
+        assertEquals(409, limit.getStatusCode().value());
+        assertEquals("PROJECT_LIMIT_REACHED", limit.getBody().getProperties().get("code"));
+
+        var invalid = handler.invalidRequest(new InvalidRequestException("INVALID_TONE", "Zły kolor."));
+        assertEquals(400, invalid.getStatusCode().value());
+        assertEquals("INVALID_TONE", invalid.getBody().getProperties().get("code"));
+    }
+
+    @Test void mapsVerificationAndRateLimitErrors() {
+        assertEquals(403, handler.emailNotVerified().getStatusCode().value());
+
+        var resend = handler.verificationError(new VerificationException("OTP_RESEND_WAIT", 30));
+        assertEquals(429, resend.getStatusCode().value());
+        assertEquals("30", resend.getHeaders().getFirst("Retry-After"));
+        assertEquals(30L, resend.getBody().getProperties().get("retryAfterSeconds"));
+
+        var invalid = handler.verificationError(new VerificationException("OTP_INVALID", 0));
+        assertEquals(400, invalid.getStatusCode().value());
+        assertNull(invalid.getHeaders().getFirst("Retry-After"));
+
+        var limited = handler.loginRateLimited(new LoginRateLimitException(45));
+        assertEquals(429, limited.getStatusCode().value());
+        assertEquals("45", limited.getHeaders().getFirst("Retry-After"));
     }
 }

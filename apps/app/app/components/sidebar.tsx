@@ -42,8 +42,8 @@ interface SidebarProps {
   closedCount?: number;
   commentsCount?: number;
   workspaces?: Workspace[];
-  currentWorkspace?: string;
-  onWorkspaceChange?: (workspace: string) => void;
+  currentWorkspaceId?: string;
+  onWorkspaceChange?: (workspaceId: string) => void;
   onAddWorkspace?: (name: string) => void;
   user?: UserProfile | null;
   collapsed?: boolean;
@@ -59,7 +59,7 @@ export function Sidebar({
   closedCount = 0,
   commentsCount = 0,
   workspaces = [],
-  currentWorkspace = 'Moja przestrzeń',
+  currentWorkspaceId,
   onWorkspaceChange,
   onAddWorkspace,
   user = null,
@@ -189,7 +189,7 @@ export function Sidebar({
         <div className={cn('p-3', collapsed && 'p-2')}>
           <WorkspaceSwitcher
             workspaces={workspaces}
-            currentWorkspace={currentWorkspace}
+            currentWorkspaceId={currentWorkspaceId}
             onSelectWorkspace={onWorkspaceChange}
             onAddWorkspace={onAddWorkspace}
             collapsed={collapsed}

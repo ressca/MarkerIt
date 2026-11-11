@@ -10,7 +10,9 @@ import {
   Check,
   Share2,
   Archive,
+  X,
 } from 'lucide-react';
+import { ApiError } from '@markerit/api-client';
 import {
   Button,
   Tabs,
@@ -29,14 +31,15 @@ import {
   TooltipContent,
   TooltipProvider,
   Separator,
+  Sheet,
+  SheetContent,
 } from '@markerit/ui';
 import { Sidebar } from './sidebar';
 import { DashboardHeader } from './dashboard-header';
 import { MetricsSummary } from './metrics-summary';
 import { ProjectCard } from './project-card';
 import { ProjectRow } from './project-row';
-import { NewProjectDialog } from './new-project-dialog';
-import { Sheet, SheetContent } from '@markerit/ui';
+import { NewProjectDialog, type NewProjectValues } from './new-project-dialog';
 import type {
   Project,
   ProjectStatus,
@@ -47,25 +50,33 @@ import type {
   UserProfile,
 } from './types';
 import {
-  loadWorkspaces,
-  saveWorkspaces,
-  getActiveWorkspace,
-  setActiveWorkspace,
-  loadProjects,
-  saveProject,
-  updateProjectStatus,
-  deleteProjectById,
+  fetchWorkspaces,
+  fetchProjects,
+  createWorkspace as createWorkspaceRequest,
+  createProject as createProjectRequest,
+  changeProjectStatus,
+  removeProject,
+  getActiveWorkspaceId,
+  setActiveWorkspaceId,
   getSidebarCollapsed,
   setSidebarCollapsed,
 } from '../lib/projects-store';
 import { projectTimestamp } from '../lib/format';
 import { cn } from 'cn';
 
+const MAX_WORKSPACES = 3;
+const MAX_PROJECTS = 3;
+
 interface DashboardViewProps {
   initialUser: UserProfile | null;
   /** Optional fixtures used by tests and previews. */
   initialProjects?: Project[];
   initialWorkspaces?: Workspace[];
+}
+
+function errorMessage(cause: unknown): string {
+  if (cause instanceof ApiError) return cause.message;
+  return 'Nie udało się połączyć z serwerem. Spróbuj ponownie.';
 }
 
 export function DashboardView({
@@ -75,14 +86,15 @@ export function DashboardView({
 }: DashboardViewProps) {
   const user = initialUser;
 
-  // Workspaces and projects are loaded from this user's local store after mount,
-  // so the server-rendered markup and the first client render always match.
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => initialWorkspaces ?? []);
-  const [currentWorkspace, setCurrentWorkspaceState] = useState<string>(
-    () => initialWorkspaces?.[0]?.name ?? 'Moja przestrzeń'
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>(
+    () => initialWorkspaces?.[0]?.id ?? ''
   );
   const [projects, setProjects] = useState<Project[]>(() => initialProjects ?? []);
-  const [loading, setLoading] = useState(initialProjects === undefined);
+  const [loading, setLoading] = useState(
+    initialProjects === undefined || initialWorkspaces === undefined
+  );
+  const [error, setError] = useState<string | null>(null);
 
   // UI state
   const [activeTab, setActiveTab] = useState('projekty');
@@ -94,17 +106,43 @@ export function DashboardView({
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Load persisted data for the authenticated user.
+  // Load the signed-in user's workspaces and projects from the API.
   useEffect(() => {
-    if (initialProjects !== undefined) return;
+    if (initialProjects !== undefined && initialWorkspaces !== undefined) return;
 
-    const userWorkspaces = loadWorkspaces(user?.email);
-    const activeWorkspace = getActiveWorkspace(userWorkspaces, user?.email);
-    setWorkspaces(userWorkspaces);
-    setCurrentWorkspaceState(activeWorkspace);
-    setProjects(loadProjects(undefined, user?.email));
-    setLoading(false);
-  }, [user?.email, initialProjects]);
+    let active = true;
+    setLoading(true);
+
+    (async () => {
+      try {
+        const loadedWorkspaces = await fetchWorkspaces();
+        if (!active) return;
+
+        setWorkspaces(loadedWorkspaces);
+        const savedId = getActiveWorkspaceId(user?.email);
+        const selected =
+          loadedWorkspaces.find((workspace) => workspace.id === savedId) ?? loadedWorkspaces[0];
+
+        if (!selected) {
+          setCurrentWorkspaceId('');
+          setProjects([]);
+          return;
+        }
+
+        setCurrentWorkspaceId(selected.id);
+        setActiveWorkspaceId(selected.id, user?.email);
+        setProjects(await fetchProjects(selected.id, selected.name));
+      } catch (cause) {
+        if (active) setError(errorMessage(cause));
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.email, initialProjects, initialWorkspaces]);
 
   // Restore the collapsed preference without breaking hydration.
   useEffect(() => {
@@ -131,67 +169,110 @@ export function DashboardView({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toggleSidebar]);
 
-  function handleSelectWorkspace(name: string) {
-    setCurrentWorkspaceState(name);
-    setActiveWorkspace(name, user?.email);
-  }
+  const currentWorkspace =
+    workspaces.find((workspace) => workspace.id === currentWorkspaceId) ?? workspaces[0];
+  const currentWorkspaceName = currentWorkspace?.name ?? 'Moja przestrzeń';
 
-  function addWorkspace(name: string): Workspace {
-    const existing = workspaces.find((w) => w.name === name);
-    if (existing) return existing;
-
-    const initials =
-      name
-        .split(' ')
-        .filter(Boolean)
-        .map((w) => w[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase() || 'WS';
-
-    const newWs: Workspace = {
-      id: `ws-${Date.now()}`,
-      name,
-      role: 'Właściciel',
-      initials,
-      isDefault: false,
-    };
-    const updated = [...workspaces, newWs];
-    setWorkspaces(updated);
-    saveWorkspaces(updated, user?.email);
-    return newWs;
-  }
-
-  function handleAddWorkspace(name: string) {
-    addWorkspace(name);
-    handleSelectWorkspace(name);
-  }
-
-  function handleCreateProject(newProj: Omit<Project, 'id' | 'updated'>) {
-    const created = saveProject(newProj, user?.email);
-    setProjects((prev) => [created, ...prev]);
-
-    if (created.workspace && created.workspace !== currentWorkspace) {
-      addWorkspace(created.workspace);
-      handleSelectWorkspace(created.workspace);
+  async function selectWorkspace(workspace: Workspace) {
+    setCurrentWorkspaceId(workspace.id);
+    setActiveWorkspaceId(workspace.id, user?.email);
+    setMobileMenuOpen(false);
+    setLoading(true);
+    try {
+      if (initialProjects !== undefined) {
+        setProjects(initialProjects.filter((project) => project.workspaceId === workspace.id));
+      } else {
+        setProjects(await fetchProjects(workspace.id, workspace.name));
+      }
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setLoading(false);
     }
   }
 
-  function handleStatusChange(id: string, status: ProjectStatus) {
-    const stored = updateProjectStatus(id, status, user?.email);
-    const storedProject = stored.find((p) => p.id === id);
-
-    setProjects((prev) =>
-      prev.map((project) => {
-        if (project.id !== id) return project;
-        return storedProject ?? { ...project, status };
-      })
-    );
+  function handleSelectWorkspace(workspaceId: string) {
+    const workspace = workspaces.find((item) => item.id === workspaceId);
+    if (workspace) void selectWorkspace(workspace);
   }
 
-  function handleDeleteProject(id: string) {
-    deleteProjectById(id, user?.email);
-    setProjects((prev) => prev.filter((p) => p.id !== id));
+  async function handleAddWorkspace(name: string) {
+    const ownedWorkspaces = workspaces.filter(
+      (workspace) => workspace.role === 'Właściciel'
+    ).length;
+    if (ownedWorkspaces >= MAX_WORKSPACES) {
+      setError(`Możesz mieć maksymalnie ${MAX_WORKSPACES} przestrzenie robocze.`);
+      return;
+    }
+    try {
+      setError(null);
+      const workspace = await createWorkspaceRequest(name);
+      setWorkspaces((prev) => [...prev, workspace]);
+      await selectWorkspace(workspace);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    }
+  }
+
+  async function handleCreateProject(values: NewProjectValues): Promise<boolean> {
+    if (!currentWorkspace) {
+      setError('Najpierw wybierz przestrzeń roboczą.');
+      return false;
+    }
+    if (workspaceProjects.length >= MAX_PROJECTS) {
+      setError(`Każda przestrzeń może mieć maksymalnie ${MAX_PROJECTS} projekty.`);
+      return false;
+    }
+
+    try {
+      setError(null);
+      const created = await createProjectRequest(currentWorkspace.id, currentWorkspace.name, values);
+      setProjects((prev) => [created, ...prev]);
+      setWorkspaces((prev) =>
+        prev.map((workspace) =>
+          workspace.id === currentWorkspace.id
+            ? { ...workspace, projectCount: (workspace.projectCount ?? 0) + 1 }
+            : workspace
+        )
+      );
+      return true;
+    } catch (cause) {
+      setError(errorMessage(cause));
+      return false;
+    }
+  }
+
+  async function handleStatusChange(id: string, status: ProjectStatus) {
+    const project = projects.find((item) => item.id === id);
+    if (!project) return;
+
+    try {
+      setError(null);
+      const updated = await changeProjectStatus(project, status);
+      setProjects((prev) => prev.map((item) => (item.id === id ? updated : item)));
+    } catch (cause) {
+      setError(errorMessage(cause));
+    }
+  }
+
+  async function handleDeleteProject(id: string) {
+    const project = projects.find((item) => item.id === id);
+    if (!project) return;
+
+    try {
+      setError(null);
+      await removeProject(id);
+      setProjects((prev) => prev.filter((item) => item.id !== id));
+      setWorkspaces((prev) =>
+        prev.map((workspace) =>
+          workspace.id === project.workspaceId
+            ? { ...workspace, projectCount: Math.max(0, (workspace.projectCount ?? 1) - 1) }
+            : workspace
+        )
+      );
+    } catch (cause) {
+      setError(errorMessage(cause));
+    }
   }
 
   function handleTabChange(tab: string) {
@@ -200,28 +281,39 @@ export function DashboardView({
     setMobileMenuOpen(false);
   }
 
+  function openNewProject() {
+    if (workspaceProjects.length >= MAX_PROJECTS) {
+      setError(`Każda przestrzeń może mieć maksymalnie ${MAX_PROJECTS} projekty.`);
+      return;
+    }
+    setError(null);
+    setIsNewProjectOpen(true);
+  }
+
   // Projects that belong to the active workspace.
   const workspaceProjects = useMemo(() => {
+    if (!currentWorkspace) return projects;
     return projects.filter(
-      (p) => !p.workspace || p.workspace === currentWorkspace || currentWorkspace === 'Wszystkie'
+      (project) =>
+        project.workspaceId === currentWorkspace.id || project.workspace === currentWorkspace.name
     );
   }, [projects, currentWorkspace]);
 
   const sharedProjects = useMemo(
-    () => workspaceProjects.filter((p) => p.isShared),
+    () => workspaceProjects.filter((project) => project.isShared),
     [workspaceProjects]
   );
 
   const inProgressCount = useMemo(
-    () => workspaceProjects.filter((p) => p.status === 'W toku').length,
+    () => workspaceProjects.filter((project) => project.status === 'W toku').length,
     [workspaceProjects]
   );
   const closedCount = useMemo(
-    () => workspaceProjects.filter((p) => p.status === 'Zamknięty').length,
+    () => workspaceProjects.filter((project) => project.status === 'Zamknięty').length,
     [workspaceProjects]
   );
   const totalComments = useMemo(
-    () => workspaceProjects.reduce((sum, p) => sum + (p.count || 0), 0),
+    () => workspaceProjects.reduce((sum, project) => sum + (project.count || 0), 0),
     [workspaceProjects]
   );
 
@@ -240,9 +332,9 @@ export function DashboardView({
     return base
       .filter((project) => {
         if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase();
-          const matchName = project.name.toLowerCase().includes(q);
-          const matchDesc = project.description?.toLowerCase().includes(q);
+          const query = searchQuery.toLowerCase();
+          const matchName = project.name.toLowerCase().includes(query);
+          const matchDesc = project.description?.toLowerCase().includes(query);
           if (!matchName && !matchDesc) return false;
         }
 
@@ -265,6 +357,8 @@ export function DashboardView({
     comments: 'Liczba uwag',
   };
 
+  const canCreateProject = workspaceProjects.length < MAX_PROJECTS;
+
   const emptyState = searchQuery
     ? {
         title: 'Brak pasujących projektów',
@@ -284,7 +378,7 @@ export function DashboardView({
         : {
             title: 'Brak projektów w przestrzeni roboczej',
             description:
-              'Rozpocznij pracę, tworząc swój pierwszy projekt. Dodawaj makiety, obrazy i zbieraj precyzyjny feedback z zespołem.',
+              'Rozpocznij pracę, tworząc swój pierwszy projekt. Dodawaj zdjęcia do review i zbieraj precyzyjny feedback z zespołem.',
           };
 
   const sidebarProps = {
@@ -295,7 +389,7 @@ export function DashboardView({
     closedCount,
     commentsCount: totalComments,
     workspaces,
-    currentWorkspace,
+    currentWorkspaceId: currentWorkspace?.id,
     onWorkspaceChange: handleSelectWorkspace,
     onAddWorkspace: handleAddWorkspace,
     user,
@@ -306,15 +400,19 @@ export function DashboardView({
     <TooltipProvider>
       <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
         {/* Desktop full-height collapsible sidebar */}
-        <Sidebar {...sidebarProps} collapsed={sidebarCollapsed} className="hidden shrink-0 md:flex" />
+        <Sidebar
+          {...sidebarProps}
+          collapsed={sidebarCollapsed}
+          className="hidden shrink-0 md:flex"
+        />
 
         {/* Mobile sidebar drawer */}
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetContent side="left" className="p-0" showClose={false}>
             <Sidebar
               {...sidebarProps}
-              onWorkspaceChange={(name) => {
-                handleSelectWorkspace(name);
+              onWorkspaceChange={(workspaceId) => {
+                handleSelectWorkspace(workspaceId);
                 setMobileMenuOpen(false);
               }}
               onToggleCollapse={undefined}
@@ -327,13 +425,14 @@ export function DashboardView({
         {/* Main Content Area */}
         <div className="flex h-dvh flex-1 flex-col overflow-hidden">
           <DashboardHeader
-            workspaceName={currentWorkspace}
+            workspaceName={currentWorkspaceName}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            onOpenNewProject={() => setIsNewProjectOpen(true)}
+            onOpenNewProject={openNewProject}
             onToggleSidebar={toggleSidebar}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             sidebarCollapsed={sidebarCollapsed}
+            newProjectDisabled={!canCreateProject}
           />
 
           {/* Main scrollable body */}
@@ -343,7 +442,7 @@ export function DashboardView({
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <p className="eyebrow text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {currentWorkspace.toUpperCase()} · WORKSPACE
+                    {currentWorkspaceName.toUpperCase()} · WORKSPACE
                   </p>
                   <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
                     Twoje projekty
@@ -357,7 +456,8 @@ export function DashboardView({
 
                 <div className="flex items-center gap-2">
                   <Button
-                    onClick={() => setIsNewProjectOpen(true)}
+                    onClick={openNewProject}
+                    disabled={!canCreateProject}
                     className="primary-button gap-1.5 font-semibold shadow-2xs"
                   >
                     <Plus className="size-4" />
@@ -365,6 +465,26 @@ export function DashboardView({
                   </Button>
                 </div>
               </div>
+
+              {/* API / limit errors */}
+              {error && (
+                <div
+                  role="alert"
+                  className="flex items-start justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                >
+                  <span className="leading-relaxed">{error}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => setError(null)}
+                    aria-label="Zamknij komunikat błędu"
+                    className="size-5 shrink-0 text-destructive hover:bg-destructive/15"
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </div>
+              )}
 
               {/* Live metrics computed from the user's projects */}
               <MetricsSummary
@@ -529,7 +649,8 @@ export function DashboardView({
                         ) : activeTab === 'projekty' ? (
                           <Button
                             size="sm"
-                            onClick={() => setIsNewProjectOpen(true)}
+                            onClick={openNewProject}
+                            disabled={!canCreateProject}
                             className="gap-1.5"
                           >
                             <Plus className="size-4" />
@@ -570,7 +691,7 @@ export function DashboardView({
               <footer className="dashboard-footer flex flex-col items-center justify-between gap-2 pt-4 pb-2 text-xs text-muted-foreground sm:flex-row">
                 <span className="flex items-center gap-1.5">
                   <span className="size-2 rounded-full bg-emerald-500" />
-                  Zmiany w projektach są zapisywane w tej przeglądarce.
+                  Wszystkie zmiany są zapisywane w bazie danych.
                 </span>
                 <span>
                   marker<span className="font-bold text-primary">It</span> · spokojniejszy feedback
@@ -584,8 +705,7 @@ export function DashboardView({
         <NewProjectDialog
           open={isNewProjectOpen}
           onOpenChange={setIsNewProjectOpen}
-          defaultWorkspace={currentWorkspace}
-          user={user}
+          workspaceName={currentWorkspaceName}
           onCreateProject={handleCreateProject}
         />
       </div>

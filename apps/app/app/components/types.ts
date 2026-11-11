@@ -10,6 +10,7 @@ export interface ProjectMember {
 
 export interface Project {
   id: string;
+  workspaceId: string;
   name: string;
   description?: string;
   workspace: string;
@@ -29,6 +30,7 @@ export interface Workspace {
   role: string;
   initials: string;
   isDefault?: boolean;
+  projectCount?: number;
 }
 
 export interface UserProfile {

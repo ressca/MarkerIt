@@ -19,15 +19,15 @@ import { cn } from 'cn';
 
 interface WorkspaceSwitcherProps {
   workspaces?: Workspace[];
-  currentWorkspace?: string;
-  onSelectWorkspace?: (workspace: string) => void;
+  currentWorkspaceId?: string;
+  onSelectWorkspace?: (workspaceId: string) => void;
   onAddWorkspace?: (name: string) => void;
   collapsed?: boolean;
 }
 
 export function WorkspaceSwitcher({
   workspaces = [],
-  currentWorkspace = 'Główna przestrzeń',
+  currentWorkspaceId,
   onSelectWorkspace,
   onAddWorkspace,
   collapsed = false,
@@ -41,22 +41,17 @@ export function WorkspaceSwitcher({
     : [
         {
           id: 'ws-1',
-          name: currentWorkspace,
+          name: 'Moja przestrzeń',
           role: 'Właściciel',
-          initials: currentWorkspace.slice(0, 2).toUpperCase(),
+          initials: 'MP',
           isDefault: true,
         },
       ];
 
-  const activeWs = list.find((w) => w.name === currentWorkspace) || {
-    id: 'ws-curr',
-    name: currentWorkspace,
-    role: 'Właściciel',
-    initials: currentWorkspace.slice(0, 2).toUpperCase(),
-  };
+  const activeWs = list.find((w) => w.id === currentWorkspaceId) || list[0];
 
-  function handleSelect(name: string) {
-    onSelectWorkspace?.(name);
+  function handleSelect(workspaceId: string) {
+    onSelectWorkspace?.(workspaceId);
     setOpen(false);
   }
 
@@ -64,7 +59,6 @@ export function WorkspaceSwitcher({
     e.preventDefault();
     if (!newWsName.trim()) return;
     onAddWorkspace?.(newWsName.trim());
-    onSelectWorkspace?.(newWsName.trim());
     setNewWsName('');
     setIsAdding(false);
     setOpen(false);
@@ -103,13 +97,13 @@ export function WorkspaceSwitcher({
             </div>
             <div className="flex flex-col gap-0.5">
               {list.map((ws) => {
-                const isCurrent = ws.name === currentWorkspace;
+                const isCurrent = ws.id === activeWs.id;
                 return (
                   <Button
                     key={ws.id}
                     type="button"
                     variant="ghost"
-                    onClick={() => handleSelect(ws.name)}
+                    onClick={() => handleSelect(ws.id)}
                     className={cn(
                       'h-auto w-full items-center justify-between px-2.5 py-2 text-left text-xs',
                       isCurrent
@@ -169,13 +163,13 @@ export function WorkspaceSwitcher({
         </div>
         <div className="flex flex-col gap-0.5">
           {list.map((ws) => {
-            const isCurrent = ws.name === currentWorkspace;
+            const isCurrent = ws.id === activeWs.id;
             return (
               <Button
                 key={ws.id}
                 type="button"
                 variant="ghost"
-                onClick={() => handleSelect(ws.name)}
+                onClick={() => handleSelect(ws.id)}
                 className={cn(
                   'h-auto w-full items-center justify-between px-2.5 py-2 text-left text-xs',
                   isCurrent

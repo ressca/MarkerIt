@@ -182,3 +182,132 @@ export async function loginAccount(input: { email: string; password: string }): 
     body: JSON.stringify(input),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Dashboard: workspaces and projects
+// ---------------------------------------------------------------------------
+
+export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+export type ProjectStatus = 'ACTIVE' | 'IN_REVIEW' | 'CLOSED';
+export type ProjectTone = 'sage' | 'sand' | 'blue' | 'lilac' | 'emerald' | 'amber';
+
+export type WorkspaceDto = {
+  id: string;
+  name: string;
+  description?: string | null;
+  role: WorkspaceRole;
+  projectCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectMemberDto = {
+  id: string;
+  displayName: string;
+  initials: string;
+};
+
+export type ProjectDto = {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description?: string | null;
+  status: ProjectStatus;
+  tone: ProjectTone;
+  createdBy?: string | null;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+  openComments: number;
+  members: ProjectMemberDto[];
+};
+
+export type CreateWorkspaceInput = {
+  name: string;
+  description?: string;
+};
+
+export type UpdateWorkspaceInput = {
+  name: string;
+  description?: string;
+};
+
+export type CreateProjectInput = {
+  name: string;
+  description?: string;
+  tone?: ProjectTone;
+};
+
+export type UpdateProjectInput = {
+  name?: string;
+  description?: string;
+  status?: ProjectStatus;
+  tone?: ProjectTone;
+};
+
+export function listWorkspaces(): Promise<WorkspaceDto[]> {
+  return apiRequest<WorkspaceDto[]>('workspaces');
+}
+
+export function getWorkspace(workspaceId: string): Promise<WorkspaceDto> {
+  return apiRequest<WorkspaceDto>(`workspaces/${encodeURIComponent(workspaceId)}`);
+}
+
+export async function createWorkspace(input: CreateWorkspaceInput): Promise<WorkspaceDto> {
+  return apiRequest<WorkspaceDto>('workspaces', {
+    method: 'POST',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateWorkspace(
+  workspaceId: string,
+  input: UpdateWorkspaceInput,
+): Promise<WorkspaceDto> {
+  return apiRequest<WorkspaceDto>(`workspaces/${encodeURIComponent(workspaceId)}`, {
+    method: 'PATCH',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteWorkspace(workspaceId: string): Promise<void> {
+  await apiRequest<void>(`workspaces/${encodeURIComponent(workspaceId)}`, {
+    method: 'DELETE',
+    headers: await csrfHeaders(),
+  });
+}
+
+export function listProjects(workspaceId: string): Promise<ProjectDto[]> {
+  return apiRequest<ProjectDto[]>(`workspaces/${encodeURIComponent(workspaceId)}/projects`);
+}
+
+export async function createProject(
+  workspaceId: string,
+  input: CreateProjectInput,
+): Promise<ProjectDto> {
+  return apiRequest<ProjectDto>(`workspaces/${encodeURIComponent(workspaceId)}/projects`, {
+    method: 'POST',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateProject(
+  projectId: string,
+  input: UpdateProjectInput,
+): Promise<ProjectDto> {
+  return apiRequest<ProjectDto>(`projects/${encodeURIComponent(projectId)}`, {
+    method: 'PATCH',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteProject(projectId: string): Promise<void> {
+  await apiRequest<void>(`projects/${encodeURIComponent(projectId)}`, {
+    method: 'DELETE',
+    headers: await csrfHeaders(),
+  });
+}

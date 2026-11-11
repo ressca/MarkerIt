@@ -1,8 +1,8 @@
 # MarkerIt — model bazy danych (propozycja)
 
-> **Status: PROPOZYCJA DO AKCEPTACJI.** Ten dokument opisuje docelowy model danych.
-> Nie zawiera jeszcze migracji ani kodu. Po akceptacji model zostanie wdrożony
-> etapami jako migracje Flyway (`V4__...`, `V5__...`).
+> **Status: ZAAKCEPTOWANY I WDROŻONY.** Model jest wdrażany migracjami Flyway
+> `V4`–`V6`. Tabele pod kolejne etapy powstają od razu; billing i integracje
+> są poza zakresem.
 
 ## 1. Założenia
 
@@ -172,11 +172,6 @@ erDiagram
     users ||--o{ notification_preferences : "ustawia"
     workspaces ||--o{ activity_events : "aktywność"
     workspaces ||--o{ audit_events : "audyt"
-    workspaces ||--o{ subscriptions : "subskrypcja"
-    plans ||--o{ subscriptions : "plan"
-    workspaces ||--o{ usage_counters : "zużycie"
-    workspaces ||--o{ api_keys : "klucze"
-    workspaces ||--o{ webhooks : "webhooki"
 
     notifications {
         uuid id PK
@@ -202,14 +197,6 @@ erDiagram
         uuid entity_id
         jsonb metadata
         timestamptz created_at
-    }
-    subscriptions {
-        uuid id PK
-        uuid workspace_id FK
-        uuid plan_id FK
-        varchar status
-        varchar provider
-        timestamptz current_period_end
     }
 ```
 
@@ -278,7 +265,7 @@ Bez zmian. Indeksy już istnieją.
 | `name` | `VARCHAR(50)` | `NOT NULL`, `CHECK (length(btrim(name)) >= 3)` |
 | `slug` | `VARCHAR(60)` | `NOT NULL` |
 | `description` | `TEXT` |  |
-| `status` | `VARCHAR(20)` | `NOT NULL DEFAULT 'ACTIVE'`, `CHECK (status IN ('ACTIVE','IN_REVIEW','CLOSED','ARCHIVED'))` |
+| `status` | `VARCHAR(20)` | `NOT NULL DEFAULT 'ACTIVE'`, `CHECK (status IN ('ACTIVE','IN_REVIEW','CLOSED'))` |
 | `visibility` | `VARCHAR(20)` | `NOT NULL DEFAULT 'WORKSPACE'`, `CHECK (visibility IN ('WORKSPACE','PRIVATE'))` |
 | `tone` | `VARCHAR(20)` | `NOT NULL DEFAULT 'sage'`, `CHECK (tone IN ('sage','sand','blue','lilac','emerald','amber'))` |
 | `created_by` | `UUID` | `REFERENCES users(id) ON DELETE SET NULL` |
@@ -290,7 +277,8 @@ Bez zmian. Indeksy już istnieją.
 - `UNIQUE (workspace_id, slug)` wśród nieusuniętych.
 - Indeksy: `(workspace_id, status)`, `(workspace_id, updated_at DESC)`.
 - Mapowanie obecnego UI: `W toku` → `ACTIVE`, `Do sprawdzenia` → `IN_REVIEW`,
-  `Zamknięty` → `CLOSED`, `Archiwum` → `ARCHIVED`.
+  `Zamknięty` → `CLOSED`. **Zamknięty = zarchiwizowany** — nie ma osobnego statusu
+  `ARCHIVED`; filtr „Archiwum” pokazuje projekty `CLOSED`.
 - `isShared` nie jest kolumną — wynika z `project_members` / `share_links`.
 
 #### `project_members`
@@ -533,55 +521,6 @@ Publiczne/wewnętrzne linki do review lub całego projektu.
 - Indeksy: `(workspace_id, created_at DESC)`, `(actor_id, created_at DESC)`.
 - Akcje bezpieczeństwa: logowanie, zmiana uprawnień, usunięcie projektu itp.
 
-### 5.6. Etap 5 — plany i rozliczenia
-
-#### `plans`
-
-- `id`, `code UNIQUE`, `name`, `description`, `price_cents`, `currency CHAR(3)`
-  (domyślnie `PLN`), `billing_interval` (`MONTH`/`YEAR`), `limits JSONB`,
-  `features JSONB`, `active`, `created_at`, `updated_at`.
-
-#### `subscriptions`
-
-- `id`, `workspace_id`, `plan_id`, `status`
-  (`TRIALING`/`ACTIVE`/`PAST_DUE`/`CANCELED`/`INCOMPLETE`), `provider`
-  (`STRIPE`/`MANUAL`), `provider_customer_id`, `provider_subscription_id`,
-  `current_period_start`, `current_period_end`, `trial_ends_at`,
-  `cancel_at_period_end`, `canceled_at`, `created_at`, `updated_at`.
-- Częściowy unikat: jedna aktywna/trial subskrypcja na workspace.
-
-#### `usage_counters`
-
-- PK `(workspace_id, metric, period_start)`; `period_end`, `value BIGINT`,
-  `updated_at`.
-- Metryki: `PROJECTS`, `STORAGE_BYTES`, `REVIEWS`, `TEAM_MEMBERS`.
-
-#### `invoices`
-
-- `id`, `subscription_id`, `provider_invoice_id UNIQUE`, `amount_cents`, `currency`,
-  `status` (`DRAFT`/`OPEN`/`PAID`/`VOID`/`UNCOLLECTIBLE`), `issued_at`, `paid_at`,
-  `hosted_invoice_url`, `created_at`.
-
-#### `billing_events`
-
-- `id`, `provider`, `provider_event_id UNIQUE`, `type`, `payload JSONB`,
-  `processed_at`, `created_at` — idempotencja webhooków płatności.
-
-### 5.7. Etap 6 — integracje (opcjonalne)
-
-#### `api_keys`
-
-- `id`, `workspace_id`, `name`, `key_prefix VARCHAR(12)`, `key_hash CHAR(64) UNIQUE`,
-  `created_by`, `last_used_at`, `expires_at`, `revoked_at`, `created_at`.
-
-#### `webhooks`, `webhook_deliveries`
-
-- `webhooks`: `id`, `workspace_id`, `url`, `secret_hash`, `events JSONB`,
-  `active`, `created_at`, `updated_at`.
-- `webhook_deliveries`: `id`, `webhook_id`, `event_id`, `event_type`, `payload JSONB`,
-  `status`, `attempts`, `response_status`, `last_error`, `next_attempt_at`,
-  `delivered_at`, `created_at`.
-
 ## 6. Uprawnienia — proponowany model
 
 ### Role workspace
@@ -609,7 +548,7 @@ Członek workspace'u widzi projekty `WORKSPACE`; projekt `PRIVATE` wymaga grantu
 ## 7. Ważne decyzje projektowe
 
 1. **Workspace jako tenant** — każdy projekt ma `workspace_id`; nie ma projektów
-   „poza workspace”. Domyślny osobisty workspace tworzony przy rejestracji.
+   „poza workspace”. Domyślny osobisty workspace tworzony automatycznie przy pierwszym wejściu.
 2. **Wersjonowanie review** — review ma wersje, a pinezki są przypięte do wersji
    i konkretnego assetu. Pozwala to zachować historię uwag po podmianie grafiki.
 3. **Pineczki w procentach** — `x_percent`/`y_percent` (0–100) zamiast pikseli,
@@ -623,49 +562,52 @@ Członek workspace'u widzi projekty `WORKSPACE`; projekt `PRIVATE` wymaga grantu
 7. **Tokeny tylko jako hash** — zaproszenia, linki share, API keys.
 8. **Rozszerzalność** — `settings`, `metadata`, `payload` jako `JSONB` tam, gdzie
    struktura może się zmieniać; reszta w kolumnach z `CHECK`.
+9. **Pliki w R2** — baza przechowuje tylko metadane i `storage_key`.
+10. **Twarde limity** — 3 przestrzenie, 3 projekty w przestrzeni, 8 review w projekcie;
+    egzekwowane w serwisie i triggerami PostgreSQL.
 
-## 8. Kolejność wdrożenia (proponowane migracje)
+## 8. Wdrożone migracje
 
-| Migracja | Zakres | Potrzebne do |
+Wszystkie tabele powstają od razu (wariant „od razu”):
+
+| Migracja | Zakres |
+| --- | --- |
+| `V4__core_workspaces_projects.sql` | rozszerzenie `users`, `workspaces`, `workspace_members`, `projects`, `project_members`, `project_favorites`, `assets`, `asset_variants`, triggery limitów |
+| `V5__reviews_assets_pins.sql` | `reviews`, `review_versions`, `review_version_assets`, `review_pins`, `pin_comments`, mentions, reactions, approvals, `tags`, `project_tags`, trigger limitu 8 review |
+| `V6__collaboration_notifications.sql` | `workspace_invitations`, `project_invitations`, `share_links`, `share_link_sessions`, `notifications`, `notification_preferences`, `email_outbox`, `activity_events`, `audit_events` |
+
+Billing i integracje (API keys, webhooks) są świadomie pominięte.
+
+## 9. Limity produktu
+
+Limity są egzekwowane w serwisach oraz triggerami w bazie:
+
+| Zasób | Limit | Egzekwowanie |
 | --- | --- | --- |
-| `V4__core_workspaces_projects.sql` | rozszerzenie `users`, `workspaces`, `workspace_members`, `projects`, `project_members`, `project_favorites` | obecny dashboard |
-| `V5__reviews_assets_pins.sql` | `assets`, `asset_variants`, `reviews`, `review_versions`, `review_version_assets`, `review_pins`, `pin_comments`, mentions, reactions, approvals, tags | etap review |
-| `V6__collaboration_sharing.sql` | `workspace_invitations`, `project_invitations`, `share_links`, `share_link_sessions` | zaproszenia i linki |
-| `V7__notifications_activity.sql` | `notifications`, `notification_preferences`, `email_outbox`, `activity_events`, `audit_events` | powiadomienia i feed |
-| `V8__billing.sql` | `plans`, `subscriptions`, `usage_counters`, `invoices`, `billing_events` | plany i limity |
-| `V9__integrations.sql` | `api_keys`, `webhooks`, `webhook_deliveries` | integracje |
+| Przestrzenie robocze na użytkownika | 3 | `WorkspaceService` + trigger `workspaces_enforce_limit` |
+| Projekty w przestrzeni | 3 | `ProjectService` + trigger `projects_enforce_limit` |
+| Review (zdjęcia do review) w projekcie | 8 | trigger `reviews_enforce_limit` + walidacja w serwisie review (etap UI) |
+| Pinezki i komentarze | bez limitu | — |
 
-Możliwe dwa warianty:
-- **A (rekomendowany):** tworzymy migracje etapami, gdy dany etap wchodzi do pracy.
-  Model jest zamknięty, ale baza nie ma pustych tabel.
-- **B:** tworzymy wszystkie tabele od razu w `V4`–`V9`, mimo że część nie jest jeszcze
-  używana. Więcej martwego schematu, ale pełna gotowość.
+## 10. Przechowywanie plików
 
-## 9. Migracja obecnych danych z localStorage
+- Pliki binarne: **Cloudflare R2** (S3-compatible), nie w bazie.
+- W bazie trzymamy metadane i klucz obiektu w `assets` (`storage_provider = 'R2'`,
+  `storage_key`, `content_type`, `size_bytes`, `checksum_sha256`, `width`, `height`).
+- Zdjęcia profilowe: `assets.purpose = 'AVATAR'`, `users.avatar_asset_id`.
+- Zdjęcia do review: `assets.purpose = 'REVIEW_IMAGE'`, podpięte przez
+  `review_version_assets`.
+- Miniatury/preview: `asset_variants`.
+- Dla developmentu dopuszczamy `storage_provider = 'LOCAL'`; produkcja używa R2.
 
-Obecny dashboard trzyma projekty w `localStorage` per e-mail. Po wdrożeniu API
-proponuję jednorazowy import:
-- endpoint `POST /api/v1/imports/local-projects` (idempotentny po `user_id` + `client_import_id`),
-- mapowanie: jeden lokalny workspace → domyślny workspace użytkownika,
-- statusy i `tone` mapowane 1:1,
-- liczniki uwag bez historii (na start `0` lub wartość z lokalnego pola `count`
-  jako „uwagi zaimportowane”),
-- po sukcesie front czyści lokalny magazyn.
+## 11. Decyzje przyjęte
 
-Alternatywa: prosty przycisk „Zaimportuj projekty z tej przeglądarki” w dashboardzie.
-Trzeba zdecydować, czy import jest częścią etapu 1.
-
-## 10. Do akceptacji
-
-Przed implementacją proszę o decyzję w tych punktach:
-
-1. **Workspace jako tenant** i domyślny osobisty workspace przy rejestracji — OK?
-2. **Role:** `OWNER`, `ADMIN`, `MEMBER`, `VIEWER` + granty projektowe
-   `VIEW`, `COMMENT`, `EDIT`, `ADMIN` — OK?
-3. **Review z wersjami** (rekomendowane) czy na start płaskie review bez wersji?
-4. **Pinezki przypięte do wersji i assetu** — OK?
-5. **Wszystkie tabele od razu** (wariant B) czy **etapami** (wariant A, rekomendowany)?
-6. **Billing:** czy zostawiamy miejsca na Stripe i walutę PLN, czy na razie tylko
-   tabele planów/limitów bez płatności?
-7. **Import danych z localStorage** — potrzebny w etapie 1?
-8. Czy `users` ma dostać `display_name` i `avatar_url` już teraz (rekomendowane)?
+1. Workspace jest tenantem; domyślny osobisty workspace tworzony automatycznie. ✅
+2. Role: `OWNER`, `ADMIN`, `MEMBER`, `VIEWER` + granty projektowe
+   `VIEW`, `COMMENT`, `EDIT`, `ADMIN`. ✅
+3. Review z wersjami. ✅
+4. Pinezki przypięte do wersji i assetu. ✅
+5. Wszystkie tabele od razu. ✅
+6. Bez billingu. ✅
+7. Bez importu danych z `localStorage` — startujemy od nowa. ✅
+8. `display_name` i `avatar_asset_id` w `users`; pliki w Cloudflare R2. ✅

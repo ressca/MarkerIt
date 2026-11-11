@@ -19,6 +19,7 @@ interface DashboardHeaderProps {
   onToggleSidebar?: () => void;
   onOpenMobileMenu?: () => void;
   sidebarCollapsed?: boolean;
+  newProjectDisabled?: boolean;
 }
 
 export function DashboardHeader({
@@ -29,6 +30,7 @@ export function DashboardHeader({
   onToggleSidebar,
   onOpenMobileMenu,
   sidebarCollapsed = false,
+  newProjectDisabled = false,
 }: DashboardHeaderProps) {
   return (
     <TooltipProvider>
@@ -101,6 +103,7 @@ export function DashboardHeader({
             type="button"
             size="sm"
             onClick={onOpenNewProject}
+            disabled={newProjectDisabled}
             className="primary-button gap-1.5 shadow-2xs font-semibold"
           >
             <Plus className="size-4" />
