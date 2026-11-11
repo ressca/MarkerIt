@@ -25,14 +25,10 @@ function decodePayload(token: string): SessionTokenPayload | null {
 }
 
 function displayNameFromEmail(email: string): string {
+  // Keep the fallback identical to the value stored by the API on registration.
+  // Prettier names come from the `name` claim once the user re-authenticates.
   const localPart = email.split('@')[0] ?? '';
-  if (!localPart) return 'Użytkownik';
-
-  return localPart
-    .split(/[._-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+  return localPart || 'Użytkownik';
 }
 
 function initialsFromName(name: string): string {
