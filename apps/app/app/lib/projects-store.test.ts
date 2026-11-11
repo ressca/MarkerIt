@@ -90,7 +90,7 @@ describe('projects store', () => {
       status: 'Do sprawdzenia',
       tone: 'blue',
       count: 4,
-      members: [{ name: 'Anna Kowalska', initials: 'AK' }],
+      members: [{ id: 'u-1', name: 'Anna Kowalska', initials: 'AK' }],
     });
   });
 

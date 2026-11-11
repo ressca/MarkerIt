@@ -42,7 +42,7 @@ const projects: Project[] = [
     tone: 'sage',
     updatedAt: new Date().toISOString(),
     updated: 'Dziś',
-    members: [{ name: 'Anna Kowalska', initials: 'AK' }],
+    members: [{ id: user.id, name: 'Anna Kowalska', initials: 'AK' }],
   },
   {
     id: 'proj-2',
@@ -55,7 +55,7 @@ const projects: Project[] = [
     tone: 'sand',
     updatedAt: new Date(Date.now() - 86_400_000).toISOString(),
     updated: 'Wczoraj',
-    members: [{ name: 'Anna Kowalska', initials: 'AK' }],
+    members: [{ id: user.id, name: 'Anna Kowalska', initials: 'AK' }],
   },
   {
     id: 'proj-3',
@@ -68,7 +68,7 @@ const projects: Project[] = [
     tone: 'blue',
     updatedAt: new Date(Date.now() - 3 * 86_400_000).toISOString(),
     updated: '3 dni temu',
-    members: [{ name: 'Anna Kowalska', initials: 'AK' }],
+    members: [{ id: user.id, name: 'Anna Kowalska', initials: 'AK' }],
   },
 ];
 
@@ -105,6 +105,11 @@ describe('DashboardView', () => {
     // Counts come from the projects themselves (3 projects, 14 comments).
     const summary = screen.getByRole('region', { name: 'Podsumowanie workspace' });
     expect(within(summary).getByText('14')).toBeInTheDocument();
+
+    // Same person across projects must count once (identity is the user id, not the display name).
+    const membersCard = within(summary).getByText('Osoby w workspace').closest('[data-slot="card"]');
+    expect(membersCard).toHaveTextContent('1');
+    expect(membersCard).not.toHaveTextContent('2');
   });
 
   it('shows namespace usage limits without metric badges', () => {

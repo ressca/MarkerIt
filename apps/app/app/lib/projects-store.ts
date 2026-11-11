@@ -75,6 +75,7 @@ export function toProject(dto: ProjectDto, workspaceName: string): Project {
     updatedAt: dto.updatedAt,
     updated: '',
     members: dto.members.map((member) => ({
+      id: member.id,
       name: member.displayName,
       initials: member.initials,
     })),

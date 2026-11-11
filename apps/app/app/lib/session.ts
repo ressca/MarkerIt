@@ -7,6 +7,7 @@ interface SessionTokenPayload {
   sub?: string;
   id?: string;
   email?: string;
+  name?: string;
 }
 
 function decodePayload(token: string): SessionTokenPayload | null {
@@ -63,7 +64,10 @@ export async function getSessionUser(): Promise<UserProfile | null> {
 
   if (!email) return null;
 
-  const displayName = displayNameFromEmail(email);
+  const displayName =
+    typeof payload?.name === 'string' && payload.name.trim().length > 0
+      ? payload.name.trim()
+      : displayNameFromEmail(email);
   return {
     id,
     email,

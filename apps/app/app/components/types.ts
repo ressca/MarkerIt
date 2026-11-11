@@ -3,6 +3,7 @@ export type ProjectStatus = 'W toku' | 'Do sprawdzenia' | 'Zamknięty';
 export type ProjectTone = 'sage' | 'sand' | 'blue' | 'lilac' | 'emerald' | 'amber';
 
 export interface ProjectMember {
+  id: string;
   name: string;
   initials: string;
   avatarUrl?: string;

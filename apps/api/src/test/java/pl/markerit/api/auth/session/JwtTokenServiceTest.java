@@ -22,6 +22,7 @@ class JwtTokenServiceTest {
         UUID userId = UUID.randomUUID();
         when(user.getId()).thenReturn(userId);
         when(user.getEmail()).thenReturn("user@example.com");
+        when(user.getDisplayName()).thenReturn("Anna Kowalska");
         UserSession session = new UserSession(UUID.randomUUID(), user, Instant.now().plusSeconds(60));
 
         assertEquals("signed", service.create(user, session, Instant.now()));
@@ -30,6 +31,7 @@ class JwtTokenServiceTest {
         assertEquals(JwtTokenService.ISSUER, captor.getValue().getClaims().getClaim("iss"));
         assertEquals(userId.toString(), captor.getValue().getClaims().getSubject());
         assertEquals("user@example.com", captor.getValue().getClaims().getClaim("email"));
+        assertEquals("Anna Kowalska", captor.getValue().getClaims().getClaim("name"));
         assertEquals(session.getId().toString(), captor.getValue().getClaims().getId());
     }
 }

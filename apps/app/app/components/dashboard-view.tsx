@@ -323,13 +323,13 @@ export function DashboardView({
   );
 
   const membersCount = useMemo(() => {
-    const members = new Set<string>();
-    if (user?.displayName) members.add(user.displayName);
+    const memberIds = new Set<string>();
+    if (user?.id) memberIds.add(user.id);
     for (const project of workspaceProjects) {
-      for (const member of project.members ?? []) members.add(member.name);
+      for (const member of project.members ?? []) memberIds.add(member.id);
     }
-    return members.size;
-  }, [workspaceProjects, user?.displayName]);
+    return memberIds.size;
+  }, [workspaceProjects, user?.id]);
 
   const filteredProjects = useMemo(() => {
     const base = activeTab === 'shared' ? sharedProjects : workspaceProjects;
