@@ -10,11 +10,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import pl.markerit.api.auth.EmailAlreadyRegisteredException;
 import pl.markerit.api.auth.InvalidCredentialsException;
 import pl.markerit.api.auth.EmailNotVerifiedException;
 import pl.markerit.api.auth.PasswordPolicyException;
 import pl.markerit.api.auth.verification.VerificationException;
+import pl.markerit.api.common.ConflictException;
 import pl.markerit.api.common.ForbiddenAccessException;
 import pl.markerit.api.common.InvalidRequestException;
 import pl.markerit.api.common.LimitReachedException;
@@ -110,14 +112,29 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(InvalidRequestException.class)
     ResponseEntity<ProblemDetail> invalidRequest(InvalidRequestException exception) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(problem(HttpStatus.BAD_REQUEST, exception.getCode(), exception.getMessage()));
+        HttpStatus status = "ASSET_TOO_LARGE".equals(exception.getCode())
+                ? HttpStatus.CONTENT_TOO_LARGE
+                : HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(status)
+                .body(problem(status, exception.getCode(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    ResponseEntity<ProblemDetail> conflict(ConflictException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(problem(HttpStatus.CONFLICT, exception.getCode(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ResponseEntity<ProblemDetail> uploadTooLarge() {
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
+                .body(problem(HttpStatus.CONTENT_TOO_LARGE, "ASSET_TOO_LARGE", "Plik może mieć maksymalnie 10 MB."));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<ProblemDetail> constraintViolation() {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(problem(HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED", "An account with this email already exists."));
+                .body(problem(HttpStatus.CONFLICT, "CONSTRAINT_VIOLATION", "The operation conflicts with existing data."));
     }
 
     private ProblemDetail problem(HttpStatus status, String code, String detail) {

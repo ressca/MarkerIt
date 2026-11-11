@@ -53,9 +53,15 @@ Open the services at:
 | Web app | http://localhost:3000 |
 | Landing page | http://localhost:3001 |
 | API health | http://localhost:8080/api/health |
+| MinIO S3 API | http://localhost:9000 |
+| MinIO console | http://localhost:9001 (user/password: `minioadmin` by default) |
 | PostgreSQL | `localhost:5432` (database/user: `markerit`, password: `markerit_dev`) |
 
 The API waits until PostgreSQL passes its health check before starting. The database credentials are development defaults only; override `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in a root `.env` file if needed. The API provides health, authentication, workspace and project endpoints. Users, sessions, workspaces and projects are stored in PostgreSQL; the schema also contains tables for reviews, pins, comments, sharing, notifications and audit events.
+
+Review images are stored in an S3-compatible bucket, not in PostgreSQL. The compose stack starts MinIO on port 9000, its console on port 9001, and a one-off `minio-init` service that creates the `markerit` bucket (override with `S3_BUCKET`) when it is missing. Buckets stay private: files are read through the authenticated `GET /api/v1/assets/{id}/content` endpoint, so MinIO anonymous download is not enabled. The development credentials are `minioadmin` / `minioadmin`; override `S3_ACCESS_KEY` and `S3_SECRET_KEY` if needed. For a local API process outside compose, the storage defaults point at `http://localhost:9000` and the `markerit` bucket. To use Cloudflare R2 instead, set `STORAGE_PROVIDER=R2`, `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_REGION=auto`, `S3_PATH_STYLE=false`, and optionally `S3_PUBLIC_BASE_URL` to the public bucket or custom domain URL. Provider names are case-insensitive. Set `STORAGE_PROVIDER=LOCAL` to store uploads on disk under `LOCAL_STORAGE_DIR` without MinIO.
+
+Asset metadata responses include `originalName` and a `url` relative to the API base (`assets/{id}/content`). Clients that already prefix requests with `/api/v1` must not add the API base again. Content responses are immutable and include `Cache-Control: private, max-age=31536000, immutable` plus an `ETag` derived from the asset checksum.
 
 Stop the services with `Ctrl+C`, or run `docker compose down`. The named PostgreSQL volume is retained by default; `docker compose down -v` also deletes that development database. If you change workspace dependencies, refresh the shared Node install volume and restart the apps:
 
@@ -132,7 +138,7 @@ pnpm nx run app:test:coverage
 pnpm nx run api:test:coverage
 ```
 
-The frontend coverage command enforces at least 80% statements, branches, functions, and lines. The backend JaCoCo verification is configured for at least 80% instruction coverage. In the current work, all 55 frontend tests and 23 backend tests pass; frontend coverage is 98.35%, and the JaCoCo report shows 80% instruction coverage. **Follow-up needed:** `jacocoCoverageVerification` currently fails while reading Gradle's test-results directory instead of the JaCoCo execution-data file, so its threshold check still needs repair and a successful rerun. Reports are generated under `coverage/` for the frontend and `apps/api/build/reports/jacoco/test/html/` for the API.
+The frontend coverage command enforces at least 80% statements, branches, functions, and lines. The backend JaCoCo verification is configured for at least 80% instruction coverage. Frontend coverage is 98.35%. The API suite currently has 138 tests, the JaCoCo report shows 85.55% instruction coverage, and `jacocoCoverageVerification` passes. Reports are generated under `coverage/` for the frontend and `apps/api/build/reports/jacoco/test/html/` for the API.
 
 For CI, `affected` limits work to changes since a base revision and their dependents:
 
@@ -158,7 +164,7 @@ import { pinCreateSchema } from '@markerit/validators';
 import { apiRequest, createReviewPin } from '@markerit/api-client';
 ```
 
-The API client uses `http://localhost:8080/api/v1` by default. Set `NEXT_PUBLIC_API_URL` to override it. The landing page uses `http://localhost:3000` as the application URL by default; set `NEXT_PUBLIC_APP_URL` to override it. Set `NEXT_PUBLIC_SITE_URL` to the public landing domain in production; it is used for canonical metadata, `robots.txt`, and `sitemap.xml` (the local default is `http://localhost:3001`). The application dashboard reads workspaces and projects from the API and persists all changes in PostgreSQL. Review images and avatars are stored in Cloudflare R2; the database keeps their metadata.
+The API client uses `http://localhost:8080/api/v1` by default. Set `NEXT_PUBLIC_API_URL` to override it. The landing page uses `http://localhost:3000` as the application URL by default; set `NEXT_PUBLIC_APP_URL` to override it. Set `NEXT_PUBLIC_SITE_URL` to the public landing domain in production; it is used for canonical metadata, `robots.txt`, and `sitemap.xml` (the local default is `http://localhost:3001`). The application dashboard reads workspaces and projects from the API and persists all changes in PostgreSQL. Review images and avatars are stored in an S3-compatible bucket (MinIO locally, Cloudflare R2 in production); the database keeps their metadata.
 
 Both Next.js apps use Tailwind CSS v4 through their PostCSS configuration. The shared shadcn/ui theme and global CSS live in `packages/ui/src/styles/globals.css` and are imported by each app. The paired `components.json` files in `apps/app`, `apps/landing`, and `packages/ui` route generated shared components to `@markerit/ui`. To add a component from the repository root, for example:
 

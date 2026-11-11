@@ -317,7 +317,7 @@ Bez zmian. Indeksy już istnieją.
 | `uploaded_by` | `UUID` | `REFERENCES users(id) ON DELETE SET NULL` |
 | `purpose` | `VARCHAR(20)` | `NOT NULL`, `CHECK (purpose IN ('REVIEW_IMAGE','AVATAR','ATTACHMENT'))` |
 | `kind` | `VARCHAR(20)` | `CHECK (kind IN ('IMAGE','PDF','VIDEO','OTHER'))` |
-| `storage_provider` | `VARCHAR(20)` | `NOT NULL DEFAULT 'R2'`, `CHECK (storage_provider IN ('R2','LOCAL'))` |
+| `storage_provider` | `VARCHAR(20)` | `NOT NULL DEFAULT 'R2'`, `CHECK (storage_provider IN ('R2','S3','LOCAL'))` |
 | `storage_key` | `TEXT` | `NOT NULL` |
 | `original_name` | `TEXT` | `NOT NULL` |
 | `content_type` | `VARCHAR(255)` | `NOT NULL` |
@@ -572,7 +572,7 @@ Członek workspace'u widzi projekty `WORKSPACE`; projekt `PRIVATE` wymaga grantu
 7. **Tokeny tylko jako hash** — zaproszenia, linki share, API keys.
 8. **Rozszerzalność** — `settings`, `metadata`, `payload` jako `JSONB` tam, gdzie
    struktura może się zmieniać; reszta w kolumnach z `CHECK`.
-9. **Pliki w R2** — baza przechowuje tylko metadane i `storage_key`.
+9. **Pliki w magazynie S3/R2** — baza przechowuje tylko metadane, `storage_provider` i `storage_key`.
 10. **Twarde limity** — 3 przestrzenie, 3 projekty w przestrzeni, 8 zdjęć
     `REVIEW_IMAGE` na projekt; egzekwowane w serwisie i triggerami PostgreSQL.
     Liczba review, wersji, pinezek i komentarzy jest nieograniczona — limit dotyczy
@@ -588,6 +588,7 @@ Wszystkie tabele powstają od razu (wariant „od razu”):
 | `V5__reviews_assets_pins.sql` | `reviews`, `review_versions`, `review_version_assets`, `review_pins`, `pin_comments`, mentions, reactions, approvals, `tags`, `project_tags` |
 | `V6__collaboration_notifications.sql` | `workspace_invitations`, `project_invitations`, `share_links`, `share_link_sessions`, `notifications`, `notification_preferences`, `email_outbox`, `activity_events`, `audit_events` |
 | `V7__review_image_storage_limit.sql` | `assets.project_id`, limit 8 zdjęć na projekt, walidacja przynależności assetu do projektu |
+| `V8__allow_s3_storage_provider.sql` | `storage_provider` dopuszcza `S3` (MinIO i inne magazyny zgodne z S3) obok `R2` i `LOCAL` |
 
 Billing i integracje (API keys, webhooks) są świadomie pominięte.
 
@@ -604,14 +605,27 @@ Limity są egzekwowane w serwisach oraz triggerami w bazie:
 
 ## 10. Przechowywanie plików
 
-- Pliki binarne: **Cloudflare R2** (S3-compatible), nie w bazie.
-- W bazie trzymamy metadane i klucz obiektu w `assets` (`storage_provider = 'R2'`,
-  `storage_key`, `content_type`, `size_bytes`, `checksum_sha256`, `width`, `height`).
+- Pliki binarne: magazyn zgodny z S3, nie w bazie. Development używa lokalnego
+  **MinIO** (`STORAGE_PROVIDER=S3`), produkcja **Cloudflare R2**
+  (`STORAGE_PROVIDER=R2`) albo inny magazyn S3.
+- W bazie trzymamy metadane i klucz obiektu w `assets` (`storage_provider`,
+  `storage_key`, `content_type`, `original_name`, `size_bytes`, `checksum_sha256`,
+  `width`, `height`). `storage_provider` przyjmuje `R2`, `S3` lub `LOCAL`
+  (migracja `V8`).
+- Odczyty i usuwanie plików korzystają z providera zapisanego na assecie, a nie
+  z aktualnie skonfigurowanego backendu.
 - Zdjęcia profilowe: `assets.purpose = 'AVATAR'`, `users.avatar_asset_id`.
 - Zdjęcia do review: `assets.purpose = 'REVIEW_IMAGE'`, podpięte przez
   `review_version_assets`.
 - Miniatury/preview: `asset_variants`.
-- Dla developmentu dopuszczamy `storage_provider = 'LOCAL'`; produkcja używa R2.
+- Dla developmentu/testów dopuszczamy `storage_provider = 'LOCAL'` (katalog
+  `LOCAL_STORAGE_DIR`).
+- Pliki są serwowane przez uwierzytelniony endpoint
+  `GET /api/v1/assets/{id}/content`. `AssetResponse.url` jest ścieżką względną do
+  bazowego adresu API (`assets/{id}/content`), więc klient, który już dodaje
+  prefiks `/api/v1`, nie powinien go doklejać ponownie. Obiekty są niezmienne,
+  dlatego odpowiedź zawiera `Cache-Control: private, max-age=31536000, immutable`
+  oraz `ETag` wyliczony z `checksum_sha256` (lub `id`, gdy checksum jest pusty).
 
 ## 11. Decyzje przyjęte
 

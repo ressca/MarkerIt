@@ -13,6 +13,7 @@ import pl.markerit.api.auth.EmailNotVerifiedException;
 import pl.markerit.api.auth.InvalidCredentialsException;
 import pl.markerit.api.auth.PasswordPolicyException;
 import pl.markerit.api.auth.verification.VerificationException;
+import pl.markerit.api.common.ConflictException;
 import pl.markerit.api.common.ForbiddenAccessException;
 import pl.markerit.api.common.InvalidRequestException;
 import pl.markerit.api.common.LimitReachedException;
@@ -36,7 +37,11 @@ class ApiExceptionHandlerTest {
         assertEquals(401, handler.invalidCredentials().getStatusCode().value());
         assertEquals("INVALID_CREDENTIALS", handler.invalidCredentials().getBody().getProperties().get("code"));
         assertEquals(409, handler.duplicateEmail().getStatusCode().value());
-        assertEquals(409, handler.constraintViolation().getStatusCode().value());
+        assertEquals("EMAIL_ALREADY_REGISTERED",
+                handler.duplicateEmail().getBody().getProperties().get("code"));
+        var constraint = handler.constraintViolation();
+        assertEquals(409, constraint.getStatusCode().value());
+        assertEquals("CONSTRAINT_VIOLATION", constraint.getBody().getProperties().get("code"));
         var password = handler.passwordPolicy(new PasswordPolicyException("The password is invalid."));
         assertEquals(400, password.getStatusCode().value());
         assertEquals("The password is invalid.", ((Map<?, ?>)((java.util.List<?>)password.getBody().getProperties().get("fieldErrors")).getFirst()).get("message"));
@@ -59,6 +64,23 @@ class ApiExceptionHandlerTest {
         var invalid = handler.invalidRequest(new InvalidRequestException("INVALID_TONE", "Zły kolor."));
         assertEquals(400, invalid.getStatusCode().value());
         assertEquals("INVALID_TONE", invalid.getBody().getProperties().get("code"));
+
+        var conflict = handler.conflict(new ConflictException("ASSET_IN_USE", "Obraz jest używany."));
+        assertEquals(409, conflict.getStatusCode().value());
+        assertEquals("ASSET_IN_USE", conflict.getBody().getProperties().get("code"));
+        assertEquals("Obraz jest używany.", conflict.getBody().getDetail());
+    }
+
+    @Test void mapsMultipartSizeLimitToAssetTooLarge() {
+        var response = handler.uploadTooLarge();
+        assertEquals(413, response.getStatusCode().value());
+        assertEquals("ASSET_TOO_LARGE", response.getBody().getProperties().get("code"));
+        assertEquals("Plik może mieć maksymalnie 10 MB.", response.getBody().getDetail());
+
+        var serviceResponse = handler.invalidRequest(
+                new InvalidRequestException("ASSET_TOO_LARGE", "Plik może mieć maksymalnie 10 MB."));
+        assertEquals(413, serviceResponse.getStatusCode().value());
+        assertEquals("ASSET_TOO_LARGE", serviceResponse.getBody().getProperties().get("code"));
     }
 
     @Test void mapsVerificationAndRateLimitErrors() {
