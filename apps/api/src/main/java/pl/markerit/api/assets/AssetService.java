@@ -72,11 +72,31 @@ public class AssetService {
 
     @Transactional
     public AssetResponse upload(UUID userId, UUID projectId, MultipartFile file) {
+        return upload(userId, projectId, file, Asset.PURPOSE_REVIEW_IMAGE);
+    }
+
+    /**
+     * Uploads a comment attachment. Any workspace member who may take part in a
+     * review (including VIEWER) can add attachments; attachments do not consume
+     * the project's review image quota.
+     */
+    @Transactional
+    public AssetResponse uploadAttachment(UUID userId, UUID projectId, MultipartFile file) {
+        return upload(userId, projectId, file, Asset.PURPOSE_ATTACHMENT);
+    }
+
+    private AssetResponse upload(UUID userId, UUID projectId, MultipartFile file, String purpose) {
         Project project = projects.requireProject(projectId);
-        workspaces.requireProjectManager(project.getWorkspaceId(), userId);
+        boolean reviewImage = Asset.PURPOSE_REVIEW_IMAGE.equals(purpose);
+        if (reviewImage) {
+            workspaces.requireProjectManager(project.getWorkspaceId(), userId);
+        } else {
+            workspaces.requireMember(project.getWorkspaceId(), userId);
+        }
         validate(file);
 
-        if (assets.countByProjectIdAndPurposeAndDeletedAtIsNull(projectId, Asset.PURPOSE_REVIEW_IMAGE)
+        if (reviewImage
+                && assets.countByProjectIdAndPurposeAndDeletedAtIsNull(projectId, Asset.PURPOSE_REVIEW_IMAGE)
                 >= MAX_REVIEW_IMAGES_PER_PROJECT) {
             throw assetLimitReached();
         }
@@ -92,32 +112,47 @@ public class AssetService {
             ImageDimensions dimensions = readDimensions(staged.path());
 
             StorageService storage = storages.defaultStorage();
-            String storageKey = "projects/" + projectId + "/" + UUID.randomUUID()
+            String folder = reviewImage ? "" : "attachments/";
+            String storageKey = "projects/" + projectId + "/" + folder + UUID.randomUUID()
                     + "." + EXTENSIONS.get(contentType);
             try (InputStream content = Files.newInputStream(staged.path())) {
                 storage.putObject(storageKey, content, staged.size(), contentType);
             }
             deleteOnRollback(storage, storageKey);
 
-            Asset asset = new Asset(
-                    project.getWorkspaceId(),
-                    projectId,
-                    userId,
-                    storage.provider(),
-                    storageKey,
-                    originalName,
-                    contentType,
-                    staged.size(),
-                    dimensions.width(),
-                    dimensions.height(),
-                    Map.of("originalName", originalName),
-                    staged.checksumSha256());
+            Asset asset = reviewImage
+                    ? new Asset(
+                            project.getWorkspaceId(),
+                            projectId,
+                            userId,
+                            storage.provider(),
+                            storageKey,
+                            originalName,
+                            contentType,
+                            staged.size(),
+                            dimensions.width(),
+                            dimensions.height(),
+                            Map.of("originalName", originalName),
+                            staged.checksumSha256())
+                    : Asset.attachment(
+                            project.getWorkspaceId(),
+                            projectId,
+                            userId,
+                            storage.provider(),
+                            storageKey,
+                            originalName,
+                            contentType,
+                            staged.size(),
+                            dimensions.width(),
+                            dimensions.height(),
+                            Map.of("originalName", originalName),
+                            staged.checksumSha256());
 
             try {
                 return toResponse(assets.saveAndFlush(asset));
             } catch (DataIntegrityViolationException exception) {
                 deleteQuietly(storage, storageKey);
-                if (isAssetLimitViolation(exception)) {
+                if (reviewImage && isAssetLimitViolation(exception)) {
                     throw assetLimitReached();
                 }
                 throw exception;
@@ -165,7 +200,8 @@ public class AssetService {
         Asset asset = requireAsset(assetId);
         workspaces.requireProjectManager(asset.getWorkspaceId(), userId);
 
-        if (assets.isReferencedByReviewVersion(assetId)) {
+        if (assets.isReferencedByReviewVersion(assetId)
+                || assets.isReferencedByPinCommentAttachment(assetId)) {
             throw assetInUse();
         }
 
@@ -409,7 +445,7 @@ public class AssetService {
     private ConflictException assetInUse() {
         return new ConflictException(
                 "ASSET_IN_USE",
-                "Nie można usunąć obrazu, który jest używany w recenzji.");
+                "Nie można usunąć pliku, który jest używany w recenzji lub komentarzu.");
     }
 
     private AssetResponse toResponse(Asset asset) {

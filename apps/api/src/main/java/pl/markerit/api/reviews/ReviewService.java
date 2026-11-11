@@ -22,8 +22,15 @@ import pl.markerit.api.common.ConflictException;
 import pl.markerit.api.common.ForbiddenAccessException;
 import pl.markerit.api.common.InvalidRequestException;
 import pl.markerit.api.common.ResourceNotFoundException;
+import pl.markerit.api.feedback.Pin;
+import pl.markerit.api.feedback.PinComment;
+import pl.markerit.api.feedback.PinCommentAttachment;
+import pl.markerit.api.feedback.PinCommentAttachmentRepository;
+import pl.markerit.api.feedback.PinCommentRepository;
+import pl.markerit.api.feedback.PinRepository;
 import pl.markerit.api.projects.Project;
 import pl.markerit.api.projects.ProjectService;
+import pl.markerit.api.realtime.ReviewRealtimePublisher;
 import pl.markerit.api.reviews.web.CreateReviewRequest;
 import pl.markerit.api.reviews.web.CreateVersionRequest;
 import pl.markerit.api.reviews.web.ReviewApprovalResponse;
@@ -55,12 +62,16 @@ public class ReviewService {
     private final ReviewVersionAssetRepository versionAssets;
     private final ReviewReviewerRepository reviewers;
     private final ReviewApprovalRepository approvals;
+    private final PinRepository pins;
+    private final PinCommentRepository comments;
+    private final PinCommentAttachmentRepository commentAttachments;
     private final ProjectService projects;
     private final WorkspaceService workspaces;
     private final WorkspaceMemberRepository workspaceMembers;
     private final UserRepository users;
     private final AssetRepository assets;
     private final AssetStorageResolver storages;
+    private final ReviewRealtimePublisher realtime;
 
     public ReviewService(
             ReviewRepository reviews,
@@ -68,23 +79,31 @@ public class ReviewService {
             ReviewVersionAssetRepository versionAssets,
             ReviewReviewerRepository reviewers,
             ReviewApprovalRepository approvals,
+            PinRepository pins,
+            PinCommentRepository comments,
+            PinCommentAttachmentRepository commentAttachments,
             ProjectService projects,
             WorkspaceService workspaces,
             WorkspaceMemberRepository workspaceMembers,
             UserRepository users,
             AssetRepository assets,
-            AssetStorageResolver storages) {
+            AssetStorageResolver storages,
+            ReviewRealtimePublisher realtime) {
         this.reviews = reviews;
         this.versions = versions;
         this.versionAssets = versionAssets;
         this.reviewers = reviewers;
         this.approvals = approvals;
+        this.pins = pins;
+        this.comments = comments;
+        this.commentAttachments = commentAttachments;
         this.projects = projects;
         this.workspaces = workspaces;
         this.workspaceMembers = workspaceMembers;
         this.users = users;
         this.assets = assets;
         this.storages = storages;
+        this.realtime = realtime;
     }
 
     @Transactional(readOnly = true)
@@ -120,7 +139,10 @@ public class ReviewService {
             reviewers.save(new ReviewReviewer(review.getId(), reviewerId, userId));
         }
 
-        return toResponse(review);
+        ReviewResponse response = toResponse(review);
+        realtime.reviewCreated(
+                review.getProjectId(), review.getId(), version.getId(), response);
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -154,7 +176,11 @@ public class ReviewService {
 
         review.touch();
         reviews.save(review);
-        return toResponse(review);
+        ReviewResponse response = toResponse(review);
+        realtime.reviewUpdated(
+                review.getProjectId(), review.getId(),
+                latestVersionId(review.getId()), response);
+        return response;
     }
 
     @Transactional
@@ -180,7 +206,10 @@ public class ReviewService {
         review.touch();
         reviews.save(review);
 
-        return toVersionResponse(version);
+        ReviewVersionResponse response = toVersionResponse(version);
+        realtime.versionCreated(
+                review.getProjectId(), review.getId(), version.getId(), response);
+        return response;
     }
 
     @Transactional
@@ -214,7 +243,10 @@ public class ReviewService {
         review.touch();
         reviews.save(review);
 
-        return toApprovalResponse(approval);
+        ReviewApprovalResponse response = toApprovalResponse(approval);
+        realtime.approvalCreated(
+                review.getProjectId(), review.getId(), version.getId(), response);
+        return response;
     }
 
     @Transactional
@@ -242,7 +274,11 @@ public class ReviewService {
 
         review.close(userId);
         reviews.save(review);
-        return toResponse(review);
+        ReviewResponse response = toResponse(review);
+        realtime.reviewUpdated(
+                review.getProjectId(), review.getId(),
+                latestVersionId(review.getId()), response);
+        return response;
     }
 
     /**
@@ -250,6 +286,11 @@ public class ReviewService {
      * comments, approvals and reviewer assignments. Review images that are not
      * referenced by any other version are deleted from the database and object
      * storage, which frees a slot in the project image limit.
+     *
+     * <p>Comment attachments used only by this thread are cleaned up too. A
+     * link owned by a soft-deleted comment elsewhere is treated as inactive:
+     * the stale link row is removed before the asset so the
+     * {@code ON DELETE RESTRICT} foreign key does not block cleanup.</p>
      */
     @Transactional
     public void delete(UUID userId, UUID reviewId) {
@@ -279,11 +320,30 @@ public class ReviewService {
                     .ifPresent(asset -> assetsToDelete.put(assetId, asset));
         }
 
+        LinkedHashSet<UUID> attachmentAssetIds = attachmentAssetIds(versionIds);
+        Map<UUID, Asset> attachmentsToDelete = new LinkedHashMap<>();
+        if (!attachmentAssetIds.isEmpty()) {
+            for (Asset asset : assets.findAllById(attachmentAssetIds)) {
+                if (asset.getDeletedAt() == null) {
+                    attachmentsToDelete.put(asset.getId(), asset);
+                }
+            }
+        }
+
+        UUID latestVersionId = threadVersions.isEmpty()
+                ? null
+                : threadVersions.getLast().getId();
+        UUID projectId = review.getProjectId();
+
         reviews.delete(review);
         reviews.flush();
 
         List<Runnable> afterCommitDeletes = new ArrayList<>();
+        Set<UUID> handledAssets = new LinkedHashSet<>();
         for (Asset asset : assetsToDelete.values()) {
+            if (!handledAssets.add(asset.getId())) {
+                continue;
+            }
             if (versionAssets.countByAssetId(asset.getId()) > 0) {
                 // Another thread still displays this image; keep the asset and its object.
                 continue;
@@ -292,11 +352,53 @@ public class ReviewService {
             StorageService storage = storages.forProvider(asset.getStorageProvider());
             afterCommitDeletes.add(() -> deleteStoredObject(storage, asset.getStorageKey()));
         }
+
+        for (Asset asset : attachmentsToDelete.values()) {
+            if (!handledAssets.add(asset.getId())) {
+                continue;
+            }
+            if (versionAssets.countByAssetId(asset.getId()) > 0
+                    || commentAttachments.countActiveLinksForAsset(asset.getId()) > 0) {
+                // Still referenced by a version or a visible comment.
+                continue;
+            }
+            // Soft-deleted comments no longer block cleanup; remove their
+            // stale link rows first because of the RESTRICT foreign key.
+            commentAttachments.deleteLinksForDeletedComments(asset.getId());
+            assets.delete(asset);
+            StorageService storage = storages.forProvider(asset.getStorageProvider());
+            afterCommitDeletes.add(() -> deleteStoredObject(storage, asset.getStorageKey()));
+        }
         assets.flush();
+
+        realtime.reviewDeleted(projectId, reviewId, latestVersionId);
 
         for (Runnable cleanup : afterCommitDeletes) {
             afterCommitOrNow(cleanup);
         }
+    }
+
+    private LinkedHashSet<UUID> attachmentAssetIds(List<UUID> versionIds) {
+        if (versionIds.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+        List<Pin> threadPins = pins.findByReviewVersionIdIn(versionIds);
+        if (threadPins.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+        List<UUID> pinIds = threadPins.stream().map(Pin::getId).toList();
+        List<PinComment> threadComments = comments.findByPinIdIn(pinIds);
+        if (threadComments.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+        List<UUID> commentIds = threadComments.stream().map(PinComment::getId).toList();
+        LinkedHashSet<UUID> assetIds = new LinkedHashSet<>();
+        for (PinCommentAttachment link
+                : commentAttachments.findByIdPinCommentIdInOrderByIdPinCommentIdAscPositionAsc(
+                        commentIds)) {
+            assetIds.add(link.getAssetId());
+        }
+        return assetIds;
     }
 
     private Review requireReview(UUID reviewId) {
@@ -333,6 +435,12 @@ public class ReviewService {
                     "PROJECT_CLOSED",
                     "Projekt jest zamknięty. Otwórz projekt, aby dodawać recenzje lub wersje.");
         }
+    }
+
+    private UUID latestVersionId(UUID reviewId) {
+        return versions.findFirstByReviewIdOrderByVersionNumberDesc(reviewId)
+                .map(ReviewVersion::getId)
+                .orElse(null);
     }
 
     private ReviewVersion requireLatestVersion(UUID reviewId) {

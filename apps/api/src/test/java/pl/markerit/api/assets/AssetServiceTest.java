@@ -451,6 +451,61 @@ class AssetServiceTest {
         }
     }
 
+    @Test void uploadsAttachmentForAnyWorkspaceMemberWithoutImageQuota() throws IOException {
+        byte[] content = png(2, 2);
+        var file = new MockMultipartFile("file", "note.png", "image/png", content);
+
+        AssetResponse response = service.uploadAttachment(userId, projectId, file);
+
+        assertEquals(Asset.PURPOSE_ATTACHMENT, response.purpose());
+        assertEquals("note.png", response.originalName());
+        verify(workspaces).requireMember(workspaceId, userId);
+        verify(workspaces, never()).requireProjectManager(workspaceId, userId);
+        verify(assets, never()).countByProjectIdAndPurposeAndDeletedAtIsNull(
+                any(), any());
+        verify(storage).putObject(
+                startsWith("projects/" + projectId + "/attachments/"),
+                any(InputStream.class),
+                eq((long) content.length),
+                eq("image/png"));
+        verify(assets).saveAndFlush(argThat(asset ->
+                Asset.PURPOSE_ATTACHMENT.equals(asset.getPurpose())
+                        && Asset.KIND_IMAGE.equals(asset.getKind())
+                        && projectId.equals(asset.getProjectId())));
+    }
+
+    @Test void attachmentUploadRejectsForbiddenViewer() {
+        when(workspaces.requireMember(workspaceId, userId))
+                .thenThrow(new ForbiddenAccessException("WORKSPACE_FORBIDDEN", "Brak dostępu."));
+
+        assertThrows(ForbiddenAccessException.class,
+                () -> service.uploadAttachment(userId, projectId,
+                        new MockMultipartFile("file", "note.png", "image/png", new byte[] {1})));
+        verify(storage, never()).putObject(anyString(), any(), anyLong(), anyString());
+    }
+
+    @Test void attachmentUploadUsesSameContentValidation() {
+        InvalidRequestException exception = assertThrows(InvalidRequestException.class,
+                () -> service.uploadAttachment(userId, projectId,
+                        new MockMultipartFile("file", "note.pdf", "application/pdf",
+                                new byte[] {1, 2})));
+
+        assertEquals("UNSUPPORTED_CONTENT_TYPE", exception.getCode());
+    }
+
+    @Test void refusesToDeleteAssetUsedByAContainerComment() {
+        Asset asset = asset(UUID.randomUUID());
+        when(assets.findByIdAndDeletedAtIsNull(asset.getId())).thenReturn(Optional.of(asset));
+        when(assets.isReferencedByReviewVersion(asset.getId())).thenReturn(false);
+        when(assets.isReferencedByPinCommentAttachment(asset.getId())).thenReturn(true);
+
+        ConflictException exception = assertThrows(ConflictException.class,
+                () -> service.delete(userId, asset.getId()));
+
+        assertEquals("ASSET_IN_USE", exception.getCode());
+        verify(assets, never()).delete(any());
+    }
+
     @Test void normalizesOriginalFilename() throws IOException {
         String name = "a/../" + "x".repeat(300) + ".png";
         var file = new MockMultipartFile("file", name, "image/png", png(1, 1));

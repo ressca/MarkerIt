@@ -64,6 +64,19 @@ class AssetControllerMockMvcTest {
                 .andExpect(jsonPath("$.url").value("assets/" + assetId + "/content"));
     }
 
+    @Test void uploadsCommentAttachmentAndReturns201() throws Exception {
+        var response = new AssetResponse(assetId, projectId, "ATTACHMENT", "image/png",
+                "note.png", 2, 2, 2, "assets/" + assetId + "/content", Instant.now());
+        when(assets.uploadAttachment(eq(userId), eq(projectId), any(MultipartFile.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(multipart("/api/v1/projects/{projectId}/attachments", projectId)
+                        .file(new MockMultipartFile("file", "note.png", "image/png", new byte[] {1, 2})))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.purpose").value("ATTACHMENT"))
+                .andExpect(jsonPath("$.originalName").value("note.png"));
+    }
+
     @Test void returns403WhenViewerTriesToUpload() throws Exception {
         when(assets.upload(eq(userId), eq(projectId), any(MultipartFile.class)))
                 .thenThrow(new ForbiddenAccessException("WORKSPACE_FORBIDDEN", "Brak dostępu."));

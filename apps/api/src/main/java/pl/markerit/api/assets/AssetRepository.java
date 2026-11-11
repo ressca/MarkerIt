@@ -18,4 +18,7 @@ public interface AssetRepository extends JpaRepository<Asset, UUID> {
 
     @Query(value = "SELECT EXISTS (SELECT 1 FROM review_version_assets WHERE asset_id = :assetId)", nativeQuery = true)
     boolean isReferencedByReviewVersion(@Param("assetId") UUID assetId);
+
+    @Query(value = "SELECT EXISTS (SELECT 1 FROM pin_comment_attachments WHERE asset_id = :assetId)", nativeQuery = true)
+    boolean isReferencedByPinCommentAttachment(@Param("assetId") UUID assetId);
 }

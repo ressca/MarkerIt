@@ -17,6 +17,7 @@ import org.hibernate.type.SqlTypes;
 public class Asset {
 
     public static final String PURPOSE_REVIEW_IMAGE = "REVIEW_IMAGE";
+    public static final String PURPOSE_ATTACHMENT = "ATTACHMENT";
     public static final String KIND_IMAGE = "IMAGE";
     public static final String STATUS_READY = "READY";
 
@@ -121,6 +122,41 @@ public class Asset {
         this.height = height;
         this.status = STATUS_READY;
         this.metadata = metadata == null ? new HashMap<>() : new HashMap<>(metadata);
+    }
+
+    /**
+     * Creates a comment attachment. Attachments live in a project exactly like
+     * review images, but they do not consume the review image quota.
+     */
+    public static Asset attachment(
+            UUID workspaceId,
+            UUID projectId,
+            UUID ownerUserId,
+            String storageProvider,
+            String storageKey,
+            String originalName,
+            String contentType,
+            long sizeBytes,
+            Integer width,
+            Integer height,
+            Map<String, Object> metadata,
+            String checksumSha256) {
+        Asset asset = new Asset(
+                workspaceId,
+                projectId,
+                ownerUserId,
+                storageProvider,
+                storageKey,
+                originalName,
+                contentType,
+                sizeBytes,
+                width,
+                height,
+                metadata,
+                checksumSha256);
+        asset.purpose = PURPOSE_ATTACHMENT;
+        asset.kind = KIND_IMAGE;
+        return asset;
     }
 
     @PrePersist

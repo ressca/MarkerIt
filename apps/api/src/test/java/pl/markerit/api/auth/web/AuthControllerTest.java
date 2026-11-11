@@ -16,6 +16,7 @@ import pl.markerit.api.auth.session.AuthSessionService;
 import pl.markerit.api.auth.session.AuthSessionService.LoginSession;
 import pl.markerit.api.auth.verification.EmailVerificationService;
 import pl.markerit.api.auth.verification.VerificationException;
+import pl.markerit.api.realtime.RealtimeSessionRegistry;
 import pl.markerit.api.security.SecurityConfiguration;
 import pl.markerit.api.users.User;
 import pl.markerit.api.users.UserService;
@@ -25,6 +26,7 @@ class AuthControllerTest {
     private AuthSessionService sessions;
     private LoginRateLimiter loginRateLimiter;
     private EmailVerificationService emailVerification;
+    private RealtimeSessionRegistry realtimeSessions;
     private AuthController controller;
 
     @BeforeEach void setUp() {
@@ -32,8 +34,10 @@ class AuthControllerTest {
         sessions = mock(AuthSessionService.class);
         loginRateLimiter = mock(LoginRateLimiter.class);
         emailVerification = mock(EmailVerificationService.class);
+        realtimeSessions = mock(RealtimeSessionRegistry.class);
         when(loginRateLimiter.allow(anyString(), anyString(), any())).thenReturn(true);
-        controller = new AuthController(users, sessions, loginRateLimiter, emailVerification, false, Duration.ofHours(12));
+        controller = new AuthController(users, sessions, loginRateLimiter,
+                emailVerification, realtimeSessions, false, Duration.ofHours(12));
     }
 
     @Test void returnsCsrfToken() {
@@ -119,6 +123,7 @@ class AuthControllerTest {
         Jwt jwt = Jwt.withTokenValue("token").header("alg", "HS256").claim("jti", sessionId.toString()).build();
         var response = controller.logout(jwt);
         verify(sessions).revoke(sessionId);
+        verify(realtimeSessions).closeAuthSession(sessionId.toString());
         assertEquals(204, response.getStatusCode().value());
         assertTrue(response.getHeaders().getFirst(HttpHeaders.SET_COOKIE).contains("Max-Age=0"));
     }

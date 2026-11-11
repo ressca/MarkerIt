@@ -45,6 +45,15 @@ public class AssetController {
         return assets.upload(CurrentUser.id(jwt), projectId, file);
     }
 
+    @PostMapping(path = "/projects/{projectId}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public AssetResponse uploadAttachment(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID projectId,
+            @RequestPart("file") MultipartFile file) {
+        return assets.uploadAttachment(CurrentUser.id(jwt), projectId, file);
+    }
+
     @GetMapping("/projects/{projectId}/assets")
     public List<AssetResponse> list(
             @AuthenticationPrincipal Jwt jwt,

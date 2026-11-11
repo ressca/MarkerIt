@@ -19,8 +19,15 @@ import pl.markerit.api.common.ConflictException;
 import pl.markerit.api.common.ForbiddenAccessException;
 import pl.markerit.api.common.InvalidRequestException;
 import pl.markerit.api.common.ResourceNotFoundException;
+import pl.markerit.api.feedback.Pin;
+import pl.markerit.api.feedback.PinComment;
+import pl.markerit.api.feedback.PinCommentAttachment;
+import pl.markerit.api.feedback.PinCommentAttachmentRepository;
+import pl.markerit.api.feedback.PinCommentRepository;
+import pl.markerit.api.feedback.PinRepository;
 import pl.markerit.api.projects.Project;
 import pl.markerit.api.projects.ProjectService;
+import pl.markerit.api.realtime.ReviewRealtimePublisher;
 import pl.markerit.api.reviews.web.CreateReviewRequest;
 import pl.markerit.api.reviews.web.CreateVersionRequest;
 import pl.markerit.api.reviews.web.ReviewResponse;
@@ -41,12 +48,16 @@ class ReviewServiceTest {
     private ReviewVersionAssetRepository versionAssets;
     private ReviewReviewerRepository reviewers;
     private ReviewApprovalRepository approvals;
+    private PinRepository pins;
+    private PinCommentRepository comments;
+    private PinCommentAttachmentRepository commentAttachments;
     private ProjectService projects;
     private WorkspaceService workspaces;
     private WorkspaceMemberRepository workspaceMembers;
     private UserRepository users;
     private AssetRepository assets;
     private StorageService storage;
+    private ReviewRealtimePublisher realtime;
     private ReviewService service;
 
     private UUID userId;
@@ -63,12 +74,16 @@ class ReviewServiceTest {
         versionAssets = mock(ReviewVersionAssetRepository.class);
         reviewers = mock(ReviewReviewerRepository.class);
         approvals = mock(ReviewApprovalRepository.class);
+        pins = mock(PinRepository.class);
+        comments = mock(PinCommentRepository.class);
+        commentAttachments = mock(PinCommentAttachmentRepository.class);
         projects = mock(ProjectService.class);
         workspaces = mock(WorkspaceService.class);
         workspaceMembers = mock(WorkspaceMemberRepository.class);
         users = mock(UserRepository.class);
         assets = mock(AssetRepository.class);
         storage = mock(StorageService.class);
+        realtime = mock(ReviewRealtimePublisher.class);
         when(storage.provider()).thenReturn("S3");
 
         service = new ReviewService(
@@ -77,12 +92,16 @@ class ReviewServiceTest {
                 versionAssets,
                 reviewers,
                 approvals,
+                pins,
+                comments,
+                commentAttachments,
                 projects,
                 workspaces,
                 workspaceMembers,
                 users,
                 assets,
-                new AssetStorageResolver(List.of(storage)));
+                new AssetStorageResolver(List.of(storage)),
+                realtime);
 
         userId = UUID.randomUUID();
         otherUserId = UUID.randomUUID();
