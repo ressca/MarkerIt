@@ -93,7 +93,8 @@ describe('DashboardView', () => {
     renderDashboard();
 
     expect(screen.getByRole('heading', { name: 'Twoje projekty' })).toBeInTheDocument();
-    expect(screen.getByText(/Zalogowano jako anna\.kowalska@example\.com/)).toBeInTheDocument();
+    expect(screen.getByText('anna.kowalska@example.com')).toBeInTheDocument();
+    expect(screen.queryByText(/spokojniejszy feedback/)).not.toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Menu główne' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Podsumowanie workspace' })).toBeInTheDocument();
 

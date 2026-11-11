@@ -30,7 +30,6 @@ import {
   TooltipTrigger,
   TooltipContent,
   TooltipProvider,
-  Separator,
   Sheet,
   SheetContent,
 } from '@markerit/ui';
@@ -453,11 +452,6 @@ export function DashboardView({
                   <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
                     Twoje projekty
                   </h1>
-                  <p className="subheading mt-1 text-xs text-muted-foreground sm:text-sm">
-                    {user?.email
-                      ? `Zalogowano jako ${user.email}. Zarządzaj swoimi projektami i zbieraj uwagi.`
-                      : 'Miejsce, w którym zbierają się dobre pomysły i konkretny feedback.'}
-                  </p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -698,19 +692,6 @@ export function DashboardView({
                   </div>
                 )}
               </div>
-
-              <Separator className="mt-8" />
-
-              {/* Dashboard Footer */}
-              <footer className="dashboard-footer flex flex-col items-center justify-between gap-2 pt-4 pb-2 text-xs text-muted-foreground sm:flex-row">
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-emerald-500" />
-                  Wszystkie zmiany są zapisywane w bazie danych.
-                </span>
-                <span>
-                  marker<span className="font-bold text-primary">It</span> · spokojniejszy feedback
-                </span>
-              </footer>
             </div>
           </main>
         </div>
