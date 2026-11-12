@@ -32,4 +32,21 @@ public class SmtpVerificationEmailSender implements VerificationEmailSender {
             throw new IllegalStateException("Verification email could not be sent.", exception);
         }
     }
+
+    @Override
+    public void sendEmailChange(String recipient, String code, boolean polish) {
+        try {
+            var message = mailSender.createMimeMessage();
+            var helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(from, "markerIt");
+            helper.setTo(recipient);
+            helper.setSubject(VerificationEmailTemplate.emailChangeSubject(polish));
+            helper.setText(
+                    VerificationEmailTemplate.emailChangeText(code, polish),
+                    VerificationEmailTemplate.emailChangeHtml(code, polish));
+            mailSender.send(message);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Email change message could not be sent.", exception);
+        }
+    }
 }

@@ -22,7 +22,7 @@ public class JwtTokenService {
     }
 
     public String create(User user, UserSession session, Instant issuedAt) {
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder builder = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .subject(user.getId().toString())
                 .issuedAt(issuedAt)
@@ -30,8 +30,11 @@ public class JwtTokenService {
                 .id(session.getId().toString())
                 .claim("email", user.getEmail())
                 .claim("name", user.getDisplayName())
-                .build();
+                .claim("locale", user.getLocale());
+        if (user.getAvatarAssetId() != null) {
+            builder.claim("avatar", user.getAvatarAssetId().toString());
+        }
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
-        return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+        return encoder.encode(JwtEncoderParameters.from(header, builder.build())).getTokenValue();
     }
 }

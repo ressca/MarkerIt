@@ -59,11 +59,40 @@ public class AuthSessionService {
         });
     }
 
+    /**
+     * Re-issues the JWT for an existing active session, so profile claims such
+     * as display name, email and avatar stay in sync with the database.
+     */
+    @Transactional(readOnly = true)
+    public RefreshedToken refresh(UUID sessionId, User user) {
+        UserSession session = sessions.findById(sessionId)
+                .filter(candidate -> candidate.getRevokedAt() == null)
+                .filter(candidate -> candidate.getExpiresAt().isAfter(Instant.now()))
+                .orElseThrow(InvalidCredentialsException::new);
+        return new RefreshedToken(
+                jwtTokens.create(user, session, Instant.now()),
+                session.getExpiresAt());
+    }
+
+    @Transactional
+    public void revokeOtherSessions(UUID userId, UUID currentSessionId) {
+        Instant now = Instant.now();
+        for (UserSession session : sessions.findByUser_IdAndRevokedAtIsNull(userId)) {
+            if (!session.getId().equals(currentSessionId)) {
+                session.revoke(now);
+                sessions.save(session);
+            }
+        }
+    }
+
     @Transactional(readOnly = true)
     public boolean isActive(UUID sessionId, Instant now) {
         return sessions.existsByIdAndRevokedAtIsNullAndExpiresAtAfter(sessionId, now);
     }
 
     public record LoginSession(String token, Instant expiresAt, User user) {
+    }
+
+    public record RefreshedToken(String token, Instant expiresAt) {
     }
 }

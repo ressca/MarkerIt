@@ -138,6 +138,31 @@ public class User {
         this.updatedAt = Instant.now();
     }
 
+    public void updateDisplayName(String displayName) {
+        this.displayName = displayName.trim();
+        this.updatedAt = Instant.now();
+    }
+
+    public void updateLocale(String locale) {
+        this.locale = locale.trim().toLowerCase(java.util.Locale.ROOT);
+        this.updatedAt = Instant.now();
+    }
+
+    public void setAvatarAssetId(UUID avatarAssetId) {
+        this.avatarAssetId = avatarAssetId;
+        this.updatedAt = Instant.now();
+    }
+
+    public void changeEmail(String email) {
+        this.email = email.trim().toLowerCase(java.util.Locale.ROOT);
+        this.updatedAt = Instant.now();
+    }
+
+    public void changePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+        this.updatedAt = Instant.now();
+    }
+
     public void softDelete() {
         this.deletedAt = Instant.now();
         this.updatedAt = this.deletedAt;

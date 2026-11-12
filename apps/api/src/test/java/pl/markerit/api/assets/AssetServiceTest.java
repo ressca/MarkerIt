@@ -591,6 +591,68 @@ class AssetServiceTest {
         assertTrue(response.originalName().endsWith(".png"));
     }
 
+    @Test void uploadsAvatarWithoutProjectOrWorkspaceReferences() throws IOException {
+        byte[] content = png(128, 128);
+        var file = new MockMultipartFile("file", "avatar.png", "image/png", content);
+
+        AssetResponse response = service.uploadAvatar(userId, file);
+
+        assertEquals(Asset.PURPOSE_AVATAR, response.purpose());
+        assertNull(response.projectId());
+        assertEquals(128, response.width());
+        assertEquals(128, response.height());
+        verify(storage).putObject(
+                startsWith("avatars/" + userId + "/"),
+                any(InputStream.class),
+                eq((long) content.length),
+                eq("image/png"));
+        verify(assets).saveAndFlush(argThat(asset ->
+                asset.getWorkspaceId() == null
+                        && asset.getProjectId() == null
+                        && userId.equals(asset.getOwnerUserId())
+                        && Asset.PURPOSE_AVATAR.equals(asset.getPurpose())));
+        verifyNoInteractions(projects, workspaces);
+    }
+
+    @Test void rejectsAvatarLargerThanFiveMegabytes() {
+        var file = new MockMultipartFile("file", "avatar.png", "image/png",
+                new byte[(int) AssetService.MAX_AVATAR_SIZE_BYTES + 1]);
+
+        InvalidRequestException exception = assertThrows(InvalidRequestException.class,
+                () -> service.uploadAvatar(userId, file));
+
+        assertEquals("AVATAR_TOO_LARGE", exception.getCode());
+        verify(storage, never()).putObject(anyString(), any(), anyLong(), anyString());
+    }
+
+    @Test void servesAvatarContentWithoutWorkspaceMembership() {
+        Asset avatar = asset(UUID.randomUUID());
+        when(avatar.getPurpose()).thenReturn(Asset.PURPOSE_AVATAR);
+        when(avatar.getWorkspaceId()).thenReturn(null);
+        when(avatar.getProjectId()).thenReturn(null);
+        byte[] content = {4, 5, 6};
+        when(assets.findByIdAndDeletedAtIsNull(avatar.getId())).thenReturn(Optional.of(avatar));
+        when(storage.getObject(avatar.getStorageKey())).thenReturn(content);
+
+        AssetContent response = service.content(userId, avatar.getId());
+
+        assertArrayEquals(content, response.data());
+        verify(workspaces, never()).requireMember(any(), any());
+    }
+
+    @Test void deletesAvatarAssetAndStoredObject() {
+        Asset avatar = asset(UUID.randomUUID());
+        when(avatar.getPurpose()).thenReturn(Asset.PURPOSE_AVATAR);
+        when(assets.findByIdAndDeletedAtIsNull(avatar.getId())).thenReturn(Optional.of(avatar));
+
+        service.deleteAvatarAsset(avatar.getId());
+
+        verify(assets).delete(avatar);
+        verify(assets).flush();
+        verify(storage).deleteObject(avatar.getStorageKey());
+        verify(workspaces, never()).requireMember(any(), any());
+    }
+
     private Asset asset(UUID id) {
         Asset asset = mock(Asset.class);
         when(asset.getId()).thenReturn(id);

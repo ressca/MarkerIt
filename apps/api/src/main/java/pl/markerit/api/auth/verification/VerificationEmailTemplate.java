@@ -22,6 +22,35 @@ final class VerificationEmailTemplate {
         String ignore = polish
                 ? "Jeśli nie zakładałeś(-aś) konta w markerIt, zignoruj tę wiadomość. Twoje konto nie zostanie aktywowane bez potwierdzenia."
                 : "If you did not create a markerIt account, you can ignore this email. Your account will not be activated unless the address is verified.";
+        return render(polish, title, intro, code, expiry, ignore);
+    }
+
+    static String emailChangeSubject(boolean polish) {
+        return polish ? "Potwierdź nowy adres e-mail — markerIt" : "Confirm your new email — markerIt";
+    }
+
+    static String emailChangeText(String code, boolean polish) {
+        return polish
+                ? "Cześć!\n\nAby zmienić adres e-mail w markerIt, wpisz ten kod: " + code
+                        + "\nKod jest ważny przez 10 minut. Jeśli to nie Ty prosiłeś(-aś) o zmianę, zignoruj tę wiadomość."
+                : "Hello!\n\nTo change the email address on your markerIt account, enter this code: " + code
+                        + "\nThe code expires in 10 minutes. If you did not request this change, you can ignore this email.";
+    }
+
+    static String emailChangeHtml(String code, boolean polish) {
+        String title = polish ? "Potwierdź nowy adres e-mail" : "Confirm your new email address";
+        String intro = polish
+                ? "Otrzymaliśmy prośbę o zmianę adresu e-mail w Twoim koncie markerIt. Wpisz ten kod w aplikacji, aby dokończyć zmianę."
+                : "We received a request to change the email address on your markerIt account. Enter this code in the app to finish the change.";
+        String expiry = polish ? "Kod jest ważny przez 10 minut." : "This code is valid for 10 minutes.";
+        String ignore = polish
+                ? "Jeśli to nie Ty prosiłeś(-aś) o zmianę adresu, zignoruj tę wiadomość. Adres pozostanie bez zmian."
+                : "If you did not request this change, you can ignore this email. Your address will stay unchanged.";
+        return render(polish, title, intro, code, expiry, ignore);
+    }
+
+    private static String render(
+            boolean polish, String title, String intro, String code, String expiry, String ignore) {
         return """
                 <!doctype html><html lang="%s"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
                 <body style="margin:0;background:#fafdf8;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#202b25">

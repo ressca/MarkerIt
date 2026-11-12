@@ -51,4 +51,21 @@ public class UserService {
     public java.util.Optional<User> findById(java.util.UUID id) {
         return users.findById(id);
     }
+
+    @Transactional(readOnly = true)
+    public User requireUser(java.util.UUID id) {
+        return users.findById(id)
+                .filter(user -> user.getDeletedAt() == null)
+                .orElseThrow(() -> new pl.markerit.api.common.ResourceNotFoundException(
+                        "USER_NOT_FOUND",
+                        "Nie znaleziono użytkownika."));
+    }
+
+    @Transactional(readOnly = true)
+    public boolean verifyPassword(java.util.UUID id, String rawPassword) {
+        User user = requireUser(id);
+        return rawPassword != null
+                && !rawPassword.isEmpty()
+                && passwordEncoder.matches(rawPassword, user.getPasswordHash());
+    }
 }
