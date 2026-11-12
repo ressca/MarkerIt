@@ -11,6 +11,7 @@ import pl.markerit.api.common.InvalidRequestException;
 import pl.markerit.api.common.LimitReachedException;
 import pl.markerit.api.common.ResourceNotFoundException;
 import pl.markerit.api.common.Slugifier;
+import pl.markerit.api.feedback.PinCommentRepository;
 import pl.markerit.api.projects.web.CreateProjectRequest;
 import pl.markerit.api.projects.web.ProjectMemberResponse;
 import pl.markerit.api.projects.web.ProjectResponse;
@@ -31,11 +32,17 @@ public class ProjectService {
     private final ProjectRepository projects;
     private final UserRepository users;
     private final WorkspaceService workspaces;
+    private final PinCommentRepository comments;
 
-    public ProjectService(ProjectRepository projects, UserRepository users, WorkspaceService workspaces) {
+    public ProjectService(
+            ProjectRepository projects,
+            UserRepository users,
+            WorkspaceService workspaces,
+            PinCommentRepository comments) {
         this.projects = projects;
         this.users = users;
         this.workspaces = workspaces;
+        this.comments = comments;
     }
 
     @Transactional(readOnly = true)
@@ -44,6 +51,13 @@ public class ProjectService {
         return projects.findByWorkspaceIdAndDeletedAtIsNullOrderByUpdatedAtDesc(workspaceId).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ProjectResponse get(UUID userId, UUID projectId) {
+        Project project = requireProject(projectId);
+        workspaces.requireMember(project.getWorkspaceId(), userId);
+        return toResponse(project);
     }
 
     @Transactional
@@ -140,7 +154,7 @@ public class ProjectService {
                 createdByName,
                 project.getCreatedAt(),
                 project.getUpdatedAt(),
-                0,
+                Math.toIntExact(comments.countOpenForProject(project.getId())),
                 members);
     }
 

@@ -22,6 +22,32 @@ export function formatProjectUpdated(project: Project): string {
   return date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' });
 }
 
+/** Formats an API timestamp using the active interface language. */
+export function formatDate(value: string | null | undefined, locale: 'pl' | 'en' = 'pl'): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString(locale === 'pl' ? 'pl-PL' : 'en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+/** Formats an API timestamp with a short time component. */
+export function formatDateTime(value: string | null | undefined, locale: 'pl' | 'en' = 'pl'): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString(locale === 'pl' ? 'pl-PL' : 'en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function projectTimestamp(project: Project): number {
   const value = project.updatedAt ?? project.createdAt;
   if (!value) return 0;

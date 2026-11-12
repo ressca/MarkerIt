@@ -398,7 +398,6 @@ export function DashboardView({
     onWorkspaceChange: handleSelectWorkspace,
     onAddWorkspace: handleAddWorkspace,
     user,
-    onToggleCollapse: toggleSidebar,
   };
 
   return (
@@ -420,7 +419,6 @@ export function DashboardView({
                 handleSelectWorkspace(workspaceId);
                 setMobileMenuOpen(false);
               }}
-              onToggleCollapse={undefined}
               collapsed={false}
               className="w-full border-0"
             />

@@ -17,6 +17,7 @@ import {
   TooltipProvider,
 } from '@markerit/ui';
 import { projectNameSchema } from '@markerit/validators';
+import { useAppLocale } from '../lib/use-app-locale';
 import type { ProjectTone } from './types';
 import { cn } from 'cn';
 
@@ -48,6 +49,7 @@ export function NewProjectDialog({
   workspaceName = 'Moja przestrzeń',
   onCreateProject,
 }: NewProjectDialogProps) {
+  const { messages } = useAppLocale();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tone, setTone] = useState<ProjectTone>('sage');
@@ -90,7 +92,7 @@ export function NewProjectDialog({
   return (
     <TooltipProvider>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" closeLabel={messages.project.close}>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <DialogHeader>
               <DialogTitle>Utwórz nowy projekt</DialogTitle>

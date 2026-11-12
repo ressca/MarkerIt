@@ -13,6 +13,7 @@ import pl.markerit.api.common.ForbiddenAccessException;
 import pl.markerit.api.common.InvalidRequestException;
 import pl.markerit.api.common.LimitReachedException;
 import pl.markerit.api.common.ResourceNotFoundException;
+import pl.markerit.api.feedback.PinCommentRepository;
 import pl.markerit.api.projects.web.CreateProjectRequest;
 import pl.markerit.api.projects.web.UpdateProjectRequest;
 import pl.markerit.api.users.User;
@@ -25,6 +26,7 @@ class ProjectServiceTest {
     private ProjectRepository projects;
     private UserRepository users;
     private WorkspaceService workspaces;
+    private PinCommentRepository comments;
     private ProjectService service;
     private UUID userId;
     private UUID workspaceId;
@@ -33,7 +35,8 @@ class ProjectServiceTest {
         projects = mock(ProjectRepository.class);
         users = mock(UserRepository.class);
         workspaces = mock(WorkspaceService.class);
-        service = new ProjectService(projects, users, workspaces);
+        comments = mock(PinCommentRepository.class);
+        service = new ProjectService(projects, users, workspaces, comments);
         userId = UUID.randomUUID();
         workspaceId = UUID.randomUUID();
     }
@@ -47,6 +50,7 @@ class ProjectServiceTest {
         when(projects.findByWorkspaceIdAndDeletedAtIsNullOrderByUpdatedAtDesc(workspaceId))
                 .thenReturn(List.of(project));
         when(users.findById(userId)).thenReturn(Optional.of(creator));
+        when(comments.countOpenForProject(project.getId())).thenReturn(1L);
 
         var response = service.list(userId, workspaceId);
 
@@ -54,7 +58,47 @@ class ProjectServiceTest {
         assertEquals("Makieta", response.get(0).name());
         assertEquals("Anna Kowalska", response.get(0).createdByName());
         assertEquals("AK", response.get(0).members().get(0).initials());
-        assertEquals(0, response.get(0).openComments());
+        assertEquals(1, response.get(0).openComments());
+    }
+
+    @Test void readsProjectForWorkspaceMember() {
+        User creator = mock(User.class);
+        when(creator.getId()).thenReturn(userId);
+        when(creator.getDisplayName()).thenReturn("Anna Kowalska");
+        Project project = new Project(workspaceId, "Makieta", "makieta", "Opis", "sage", userId);
+
+        when(projects.findByIdAndDeletedAtIsNull(project.getId())).thenReturn(Optional.of(project));
+        when(workspaces.requireMember(workspaceId, userId))
+                .thenReturn(new WorkspaceMember(workspaceId, userId, "MEMBER", userId));
+        when(users.findById(userId)).thenReturn(Optional.of(creator));
+
+        var response = service.get(userId, project.getId());
+
+        assertEquals(project.getId(), response.id());
+        assertEquals("Makieta", response.name());
+        assertEquals("Opis", response.description());
+        verify(workspaces).requireMember(workspaceId, userId);
+    }
+
+    @Test void getRejectsMissingProject() {
+        UUID projectId = UUID.randomUUID();
+        when(projects.findByIdAndDeletedAtIsNull(projectId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.get(userId, projectId));
+        verify(workspaces, never()).requireMember(any(), any());
+    }
+
+    @Test void getRejectsNonWorkspaceMember() {
+        Project project = new Project(workspaceId, "Makieta", "makieta", null, "sage", userId);
+        when(projects.findByIdAndDeletedAtIsNull(project.getId())).thenReturn(Optional.of(project));
+        when(workspaces.requireMember(workspaceId, userId))
+                .thenThrow(new ForbiddenAccessException("WORKSPACE_FORBIDDEN", "Brak dostępu."));
+
+        ForbiddenAccessException exception = assertThrows(ForbiddenAccessException.class,
+                () -> service.get(userId, project.getId()));
+
+        assertEquals("WORKSPACE_FORBIDDEN", exception.getCode());
+        verify(users, never()).findById(any());
     }
 
     @Test void rejectsFourthProject() {

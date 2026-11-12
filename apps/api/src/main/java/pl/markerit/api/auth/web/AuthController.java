@@ -23,6 +23,7 @@ import pl.markerit.api.auth.session.AuthSessionService;
 import pl.markerit.api.auth.EmailAlreadyRegisteredException;
 import pl.markerit.api.auth.verification.EmailVerificationService;
 import pl.markerit.api.auth.verification.VerificationException;
+import pl.markerit.api.realtime.RealtimeSessionRegistry;
 import pl.markerit.api.security.SecurityConfiguration;
 import pl.markerit.api.users.User;
 import pl.markerit.api.users.UserService;
@@ -35,6 +36,7 @@ public class AuthController {
     private final AuthSessionService sessions;
     private final LoginRateLimiter loginRateLimiter;
     private final EmailVerificationService emailVerification;
+    private final RealtimeSessionRegistry realtimeSessions;
     private final boolean secureCookie;
     private final Duration tokenLifetime;
 
@@ -43,12 +45,14 @@ public class AuthController {
             AuthSessionService sessions,
             LoginRateLimiter loginRateLimiter,
             EmailVerificationService emailVerification,
+            RealtimeSessionRegistry realtimeSessions,
             @Value("${app.security.auth-cookie-secure:false}") boolean secureCookie,
             @Value("${app.security.jwt-lifetime:PT12H}") Duration tokenLifetime) {
         this.users = users;
         this.sessions = sessions;
         this.loginRateLimiter = loginRateLimiter;
         this.emailVerification = emailVerification;
+        this.realtimeSessions = realtimeSessions;
         this.secureCookie = secureCookie;
         this.tokenLifetime = tokenLifetime;
     }
@@ -138,7 +142,11 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@AuthenticationPrincipal Jwt jwt) {
-        sessions.revoke(UUID.fromString(jwt.getId()));
+        UUID sessionId = UUID.fromString(jwt.getId());
+        sessions.revoke(sessionId);
+        // Close only this device's STOMP connection; other sessions for the
+        // same user stay signed in.
+        realtimeSessions.closeAuthSession(sessionId.toString());
         ResponseCookie expiredCookie = ResponseCookie.from(SecurityConfiguration.SESSION_COOKIE, "")
                 .httpOnly(true)
                 .secure(secureCookie)

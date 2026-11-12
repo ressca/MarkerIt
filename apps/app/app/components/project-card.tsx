@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@markerit/ui/components/card';
 import { Badge } from '@markerit/ui/components/badge';
 import { Button } from '@markerit/ui/components/button';
@@ -54,6 +55,13 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
       size="sm"
       className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-primary/40"
     >
+      {/* The whole card is one link; the action menu sits above this overlay. */}
+      <Link
+        href={`/projects/${project.id}`}
+        aria-label={project.name}
+        className="absolute inset-0 z-10 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      />
+
       {/* Top Banner / Preview Thumbnail */}
       <div
         className={cn(
@@ -119,6 +127,7 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
             </div>
 
             {/* Action menu */}
+            <div className="relative z-20">
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -158,6 +167,7 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            </div>
           </div>
         </div>
 

@@ -25,6 +25,24 @@ The health endpoint `GET /api/health` returns:
 {"status":"ok"}
 ```
 
+## Review feedback and real-time updates
+
+Comment attachments are uploaded with `POST /api/v1/projects/{projectId}/attachments` (multipart field `file`, PNG/JPEG up to 10 MB). Any workspace member, including `VIEWER`, may upload them. They are stored under `projects/{projectId}/attachments/` and do not count towards the eight review image limit.
+
+Pins and comments use version-scoped endpoints:
+
+- `GET|POST /api/v1/reviews/{reviewId}/versions/{versionId}/pins`
+- `PATCH|DELETE /api/v1/pins/{pinId}`
+- `POST /api/v1/pins/{pinId}/comments`
+- `PATCH|DELETE /api/v1/comments/{commentId}`
+- `GET /api/v1/reviews/{reviewId}/versions/{versionId}/discussion`
+
+The discussion response has three collections: `pins` (marker metadata and comment counts), `comments` (the flat chronological feed; every item carries `pinId` for marker hover sync) and `reviews` (approval decisions with `kind: "REVIEW"` and reviewer identity).
+
+Native WebSocket STOMP is available at `/ws` (no SockJS). The handshake authenticates with the `markerit_session` cookie and rejects missing or invalid sessions with `401`. Clients subscribe to `/topic/reviews/{reviewId}` (or `/topic/projects/{projectId}`) only for workspaces they belong to; the current web project page uses only the per-review topic. Events use `type` values `PIN_CREATED`, `PIN_UPDATED`, `PIN_DELETED`, `COMMENT_CREATED`, `COMMENT_UPDATED`, `COMMENT_DELETED`, `REVIEW_CREATED`, `REVIEW_UPDATED`, `REVIEW_DELETED`, `VERSION_CREATED` and `APPROVAL_CREATED`, plus `reviewId`, `versionId`, `pinId`/`commentId` where relevant and a full `payload` for create/update events. Events are published after the database transaction commits.
+
+Unsafe HTTP methods require a CSRF token when the session is carried by the `markerit_session` cookie. Requests that present an explicit `Authorization: Bearer` header are exempt and do not need a CSRF token.
+
 For the full development stack, including PostgreSQL and Mailpit, run `docker compose up --build` from the repository root. Open `http://localhost:8025` to read verification emails; the Compose API sends them to Mailpit over SMTP. The Compose API service watches Java source changes and restarts the application.
 
 New accounts remain inactive until their email is verified. Verification codes expire after 10 minutes, allow five failed guesses, and can be resent once per minute (up to five deliveries per hour). Returning users can continue from the verification card on the registration page, or sign in with their password to reopen that card. Resend requests for unknown or already verified addresses return the same public response to reduce email enumeration.

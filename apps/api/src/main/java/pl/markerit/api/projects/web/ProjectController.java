@@ -35,6 +35,13 @@ public class ProjectController {
         return projects.list(CurrentUser.id(jwt), workspaceId);
     }
 
+    @GetMapping("/projects/{projectId}")
+    public ProjectResponse get(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID projectId) {
+        return projects.get(CurrentUser.id(jwt), projectId);
+    }
+
     @PostMapping("/workspaces/{workspaceId}/projects")
     @ResponseStatus(HttpStatus.CREATED)
     public ProjectResponse create(
