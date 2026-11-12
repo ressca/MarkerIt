@@ -279,7 +279,7 @@ export function FeedbackPage({
             className="gap-1.5 self-start sm:self-auto"
           >
             <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
-            {messages.feedback.retry}
+            {messages.feedback.refresh}
           </Button>
         </div>
 

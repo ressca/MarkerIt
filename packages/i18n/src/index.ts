@@ -291,6 +291,7 @@ export const messages = {
       loadWorkspacesError: 'Could not load your workspaces.',
       loadError: 'Could not load workspace feedback.',
       retry: 'Try again',
+      refresh: 'Refresh',
       loading: 'Loading feedback…',
       noWorkspaceTitle: 'No workspace yet',
       noWorkspaceDescription:
@@ -675,6 +676,7 @@ export const messages = {
       loadWorkspacesError: 'Nie udało się wczytać przestrzeni roboczych.',
       loadError: 'Nie udało się wczytać uwag.',
       retry: 'Spróbuj ponownie',
+      refresh: 'Odśwież',
       loading: 'Wczytywanie uwag…',
       noWorkspaceTitle: 'Brak przestrzeni roboczej',
       noWorkspaceDescription:

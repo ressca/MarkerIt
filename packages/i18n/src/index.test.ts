@@ -42,6 +42,14 @@ describe('localization', () => {
     expect(getMessages('en').project.discussionClosedNotice).toContain('closed');
   });
 
+  it('provides workspace feedback inbox copy in both languages', () => {
+    expect(getMessages('en').feedback.title).toContain('Feedback');
+    expect(getMessages('pl').feedback.title).toContain('Uwagi');
+    expect(getMessages('en').feedback.results).toContain('{count}');
+    expect(getMessages('pl').feedback.results).toContain('{total}');
+    expect(getMessages('en').feedback.closedReviewHint).toBeTruthy();
+  });
+
   it('keeps the same translation keys in both languages', () => {
     expect(flattenKeys(messages.pl).sort()).toEqual(flattenKeys(messages.en).sort());
   });
