@@ -5,11 +5,13 @@ import static org.mockito.Mockito.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import pl.markerit.api.auth.EmailAlreadyRegisteredException;
 import pl.markerit.api.auth.PasswordPolicyException;
+import pl.markerit.api.common.ResourceNotFoundException;
 
 class UserServiceTest {
     private UserRepository users;
@@ -66,5 +68,24 @@ class UserServiceTest {
         when(user.getPasswordHash()).thenReturn("encoded");
         when(passwords.matches("wrong", "encoded")).thenReturn(false);
         assertTrue(service.authenticate("person@example.com", "wrong").isEmpty());
+    }
+
+    @Test void verifiesPasswordsWithoutCallingBcryptForOverlongInput() {
+        UUID userId = UUID.randomUUID();
+        User user = mock(User.class);
+        when(users.findById(userId)).thenReturn(Optional.of(user));
+        when(user.getPasswordHash()).thenReturn("encoded");
+        when(passwords.matches("correct", "encoded")).thenReturn(true);
+
+        assertTrue(service.verifyPassword(userId, "correct"));
+        assertFalse(service.verifyPassword(userId, "ą".repeat(37)));
+        verify(passwords).matches("correct", "encoded");
+    }
+
+    @Test void reportsMissingUsers() {
+        UUID userId = UUID.randomUUID();
+        when(users.findById(userId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.requireUser(userId));
     }
 }

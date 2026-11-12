@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { APP_LOCALE_KEY, useAppLocale } from './use-app-locale';
+import { APP_LOCALE_KEY, setAppLocale, useAppLocale } from './use-app-locale';
 
 describe('useAppLocale', () => {
   beforeEach(() => window.localStorage.clear());
@@ -26,5 +26,16 @@ describe('useAppLocale', () => {
     window.localStorage.setItem(APP_LOCALE_KEY, 'de');
     const { result } = renderHook(() => useAppLocale());
     expect(result.current.locale).toBe('pl');
+  });
+
+  it('updates mounted components and storage when the language is changed', async () => {
+    const { result } = renderHook(() => useAppLocale());
+    expect(result.current.locale).toBe('pl');
+
+    setAppLocale('en');
+
+    await waitFor(() => expect(result.current.locale).toBe('en'));
+    expect(window.localStorage.getItem(APP_LOCALE_KEY)).toBe('en');
+    expect(document.documentElement.lang).toBe('en');
   });
 });

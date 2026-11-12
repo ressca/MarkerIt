@@ -62,6 +62,7 @@ import {
   setSidebarCollapsed,
 } from '../lib/projects-store';
 import { projectTimestamp } from '../lib/format';
+import { setAppLocale } from '../lib/use-app-locale';
 import { cn } from 'cn';
 
 const MAX_WORKSPACES = 3;
@@ -148,6 +149,10 @@ export function DashboardView({
   useEffect(() => {
     setSidebarCollapsedState(getSidebarCollapsed());
   }, []);
+
+  useEffect(() => {
+    if (user?.locale) setAppLocale(user.locale);
+  }, [user?.id, user?.locale]);
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsedState((prev) => {

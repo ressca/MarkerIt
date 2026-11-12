@@ -262,6 +262,106 @@ export type UpdateProjectInput = {
   tone?: ProjectTone;
 };
 
+export type UserLocale = 'pl' | 'en';
+
+export type UserProfileDto = {
+  id: string;
+  email: string;
+  displayName: string;
+  initials: string;
+  locale: UserLocale;
+  avatarAssetId?: string | null;
+  /** Content path relative to the API base URL. */
+  avatarUrl?: string | null;
+  createdAt: string;
+};
+
+export type UpdateMyProfileInput = {
+  displayName?: string;
+  locale?: UserLocale;
+};
+
+export type ChangeMyPasswordInput = {
+  currentPassword: string;
+  newPassword: string;
+};
+
+export type RequestEmailChangeInput = {
+  newEmail: string;
+  currentPassword: string;
+};
+
+export type EmailChangeChallengeDto = {
+  email: string;
+  resendAvailableAt: string;
+  expiresAt: string;
+};
+
+export function getMyProfile(): Promise<UserProfileDto> {
+  return apiRequest<UserProfileDto>('users/me');
+}
+
+export async function updateMyProfile(input: UpdateMyProfileInput): Promise<UserProfileDto> {
+  return apiRequest<UserProfileDto>('users/me', {
+    method: 'PATCH',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export async function uploadMyAvatar(file: File): Promise<UserProfileDto> {
+  const body = new FormData();
+  body.append('file', file);
+  return apiRequest<UserProfileDto>('users/me/avatar', {
+    method: 'POST',
+    headers: await csrfHeaders(),
+    body,
+  });
+}
+
+export async function deleteMyAvatar(): Promise<UserProfileDto> {
+  return apiRequest<UserProfileDto>('users/me/avatar', {
+    method: 'DELETE',
+    headers: await csrfHeaders(),
+  });
+}
+
+export async function changeMyPassword(input: ChangeMyPasswordInput): Promise<void> {
+  await apiRequest<void>('users/me/password', {
+    method: 'POST',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export async function requestEmailChange(
+  input: RequestEmailChangeInput,
+): Promise<EmailChangeChallengeDto> {
+  return apiRequest<EmailChangeChallengeDto>('users/me/email', {
+    method: 'POST',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export async function resendEmailChange(): Promise<EmailChangeChallengeDto> {
+  return apiRequest<EmailChangeChallengeDto>('users/me/email/resend', {
+    method: 'POST',
+    headers: await csrfHeaders(),
+  });
+}
+
+export async function verifyEmailChange(input: {
+  newEmail: string;
+  code: string;
+}): Promise<UserProfileDto> {
+  return apiRequest<UserProfileDto>('users/me/email/verify', {
+    method: 'POST',
+    headers: await csrfHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
 export function listWorkspaces(): Promise<WorkspaceDto[]> {
   return apiRequest<WorkspaceDto[]>('workspaces');
 }

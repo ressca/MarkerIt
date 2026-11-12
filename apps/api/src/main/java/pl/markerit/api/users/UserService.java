@@ -51,4 +51,32 @@ public class UserService {
     public java.util.Optional<User> findById(java.util.UUID id) {
         return users.findById(id);
     }
+
+    @Transactional(readOnly = true)
+    public User requireUser(java.util.UUID id) {
+        return users.findById(id)
+                .filter(user -> user.getDeletedAt() == null)
+                .orElseThrow(() -> new pl.markerit.api.common.ResourceNotFoundException(
+                        "USER_NOT_FOUND",
+                        "Nie znaleziono użytkownika."));
+    }
+
+    @Transactional
+    public User requireUserForUpdate(java.util.UUID id) {
+        return users.findByIdForUpdate(id)
+                .orElseThrow(() -> new pl.markerit.api.common.ResourceNotFoundException(
+                        "USER_NOT_FOUND",
+                        "Nie znaleziono użytkownika."));
+    }
+
+    @Transactional(readOnly = true)
+    public boolean verifyPassword(java.util.UUID id, String rawPassword) {
+        User user = requireUser(id);
+        // BCrypt rejects inputs longer than 72 UTF-8 bytes with an exception;
+        // treat them as a normal mismatch so a long password cannot cause a 500.
+        return rawPassword != null
+                && !rawPassword.isEmpty()
+                && rawPassword.getBytes(StandardCharsets.UTF_8).length <= 72
+                && passwordEncoder.matches(rawPassword, user.getPasswordHash());
+    }
 }

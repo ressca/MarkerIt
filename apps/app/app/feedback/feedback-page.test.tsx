@@ -144,6 +144,7 @@ describe('FeedbackPage', () => {
     expect(feedbackLinks.length).toBeGreaterThan(0);
     expect(feedbackLinks[0]).toHaveAttribute('aria-current', 'page');
     expect(feedbackLinks[0]).toHaveAttribute('href', '/feedback');
+    expect(feedbackLinks[0]).toHaveAccessibleName('Uwagi 1');
     expect(screen.getByRole('link', { name: /Projekty/ })).toHaveAttribute(
       'href',
       '/#projekty',

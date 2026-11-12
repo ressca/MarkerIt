@@ -50,6 +50,14 @@ describe('localization', () => {
     expect(getMessages('en').feedback.closedReviewHint).toBeTruthy();
   });
 
+  it('provides account settings copy in both languages', () => {
+    expect(getMessages('en').settings.profileTab).toBe('Profile');
+    expect(getMessages('pl').settings.profileTab).toBe('Profil');
+    expect(getMessages('en').settings.currentPasswordInvalid).toContain('incorrect');
+    expect(getMessages('pl').settings.emailCodeDescription).toContain('6-cyfrowy');
+    expect(getMessages('en').settings.languageLabel).toBe('Interface language');
+  });
+
   it('keeps the same translation keys in both languages', () => {
     expect(flattenKeys(messages.pl).sort()).toEqual(flattenKeys(messages.en).sort());
   });

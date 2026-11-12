@@ -39,6 +39,8 @@ export interface UserProfile {
   email: string;
   displayName: string;
   initials: string;
+  avatarUrl?: string;
+  locale?: 'pl' | 'en';
 }
 
 export type ViewMode = 'grid' | 'list';

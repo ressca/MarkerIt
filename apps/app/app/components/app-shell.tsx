@@ -14,6 +14,7 @@ import {
   setActiveWorkspaceId,
   setSidebarCollapsed,
 } from '../lib/projects-store';
+import { setAppLocale } from '../lib/use-app-locale';
 import type { UserProfile, Workspace } from './types';
 
 interface AppShellProps {
@@ -23,6 +24,8 @@ interface AppShellProps {
   children: ReactNode;
   /** Highlights the matching sidebar entry; defaults to the projects view. */
   activeTab?: string;
+  /** Overrides the sidebar feedback badge, e.g. with open notes on `/feedback`. */
+  feedbackCount?: number;
 }
 
 interface SidebarStats {
@@ -40,6 +43,7 @@ export function AppShell({
   breadcrumbs,
   children,
   activeTab = 'projekty',
+  feedbackCount,
 }: AppShellProps) {
   const router = useRouter();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -100,6 +104,10 @@ export function AppShell({
     setCollapsed(getSidebarCollapsed());
   }, []);
 
+  useEffect(() => {
+    if (user.locale) setAppLocale(user.locale);
+  }, [user.id, user.locale]);
+
   const toggleSidebar = useCallback(() => {
     setCollapsed((previous) => {
       const next = !previous;
@@ -150,7 +158,7 @@ export function AppShell({
     projectCount: stats.projects,
     sharedCount: stats.shared,
     closedCount: stats.closed,
-    commentsCount: stats.comments,
+    commentsCount: feedbackCount ?? stats.comments,
     workspaces,
     currentWorkspaceId: currentWorkspace?.id,
     onWorkspaceChange: handleWorkspaceChange,

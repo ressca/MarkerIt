@@ -18,6 +18,7 @@ public class Asset {
 
     public static final String PURPOSE_REVIEW_IMAGE = "REVIEW_IMAGE";
     public static final String PURPOSE_ATTACHMENT = "ATTACHMENT";
+    public static final String PURPOSE_AVATAR = "AVATAR";
     public static final String KIND_IMAGE = "IMAGE";
     public static final String STATUS_READY = "READY";
 
@@ -155,6 +156,39 @@ public class Asset {
                 metadata,
                 checksumSha256);
         asset.purpose = PURPOSE_ATTACHMENT;
+        asset.kind = KIND_IMAGE;
+        return asset;
+    }
+
+    /**
+     * Creates a profile avatar. Avatars belong to a user instead of a project,
+     * so both workspace and project references stay null.
+     */
+    public static Asset avatar(
+            UUID ownerUserId,
+            String storageProvider,
+            String storageKey,
+            String originalName,
+            String contentType,
+            long sizeBytes,
+            Integer width,
+            Integer height,
+            Map<String, Object> metadata,
+            String checksumSha256) {
+        Asset asset = new Asset(
+                null,
+                null,
+                ownerUserId,
+                storageProvider,
+                storageKey,
+                originalName,
+                contentType,
+                sizeBytes,
+                width,
+                height,
+                metadata,
+                checksumSha256);
+        asset.purpose = PURPOSE_AVATAR;
         asset.kind = KIND_IMAGE;
         return asset;
     }

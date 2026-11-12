@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
   apiRequest,
+  changeMyPassword,
   closeReview,
   createPinComment,
   createProject,
@@ -10,11 +11,13 @@ import {
   createVersionPin,
   createWorkspace,
   deleteComment,
+  deleteMyAvatar,
   deletePin,
   deleteProject,
   deleteProjectAsset,
   deleteReview,
   deleteWorkspace,
+  getMyProfile,
   getProject,
   getReview,
   getReviewDiscussion,
@@ -29,16 +32,21 @@ import {
   loginAccount,
   logoutAccount,
   registerAccount,
+  requestEmailChange,
+  resendEmailChange,
   resendVerification,
   submitReviewApproval,
   updateComment,
+  updateMyProfile,
   updatePin,
   updateProject,
   updateReview,
   updateWorkspace,
+  uploadMyAvatar,
   uploadProjectAsset,
   uploadProjectAttachment,
   verifyEmail,
+  verifyEmailChange,
 } from './index';
 
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), {
@@ -461,5 +469,99 @@ describe('project review API operations', () => {
     expect(fetchMock.mock.calls[5][1].method).toBe('POST');
     expect(fetchMock.mock.calls[7][1].method).toBe('DELETE');
     expect(fetchMock.mock.calls.every((call, index) => index % 2 === 1 || call[0].includes('/auth/csrf'))).toBe(true);
+  });
+});
+
+describe('account settings', () => {
+  const csrf = () => json({ token: 'csrf-token' });
+  const profile = {
+    id: 'u-1',
+    email: 'anna@example.com',
+    displayName: 'Anna Kowalska',
+    initials: 'AK',
+    locale: 'pl',
+    avatarAssetId: null,
+    avatarUrl: null,
+    createdAt: '2026-11-01T10:00:00Z',
+  };
+
+  it('reads and updates the current profile', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json(profile))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json({ ...profile, displayName: 'Anna Nowak' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(getMyProfile()).resolves.toEqual(profile);
+    await expect(updateMyProfile({ displayName: 'Anna Nowak' })).resolves.toMatchObject({
+      displayName: 'Anna Nowak',
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toContain('/users/me');
+    expect(fetchMock.mock.calls[0][1].method).toBeUndefined();
+    expect(fetchMock.mock.calls[2][1].method).toBe('PATCH');
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ displayName: 'Anna Nowak' });
+    expect(fetchMock.mock.calls[2][1].headers.get('X-XSRF-TOKEN')).toBe('csrf-token');
+  });
+
+  it('uploads and removes avatars as multipart requests', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json({ ...profile, avatarAssetId: 'a-1' }))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json(profile));
+    vi.stubGlobal('fetch', fetchMock);
+    const file = new File(['png'], 'avatar.png', { type: 'image/png' });
+
+    await expect(uploadMyAvatar(file)).resolves.toMatchObject({ avatarAssetId: 'a-1' });
+    await expect(deleteMyAvatar()).resolves.toEqual(profile);
+
+    expect(fetchMock.mock.calls[1][0]).toContain('/users/me/avatar');
+    expect(fetchMock.mock.calls[1][1].method).toBe('POST');
+    expect(fetchMock.mock.calls[1][1].body).toBeInstanceOf(FormData);
+    expect(fetchMock.mock.calls[1][1].headers.get('Content-Type')).toBeNull();
+    expect(fetchMock.mock.calls[3][1].method).toBe('DELETE');
+  });
+
+  it('changes the password and runs the email change flow', async () => {
+    const challenge = {
+      email: 'new@example.com',
+      resendAvailableAt: '2026-11-11T10:01:00Z',
+      expiresAt: '2026-11-11T10:10:00Z',
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json(challenge, 202))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json(challenge, 202))
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(json({ ...profile, email: 'new@example.com' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      changeMyPassword({ currentPassword: 'current', newPassword: 'new-password' }),
+    ).resolves.toBeUndefined();
+    await expect(
+      requestEmailChange({ newEmail: 'new@example.com', currentPassword: 'current' }),
+    ).resolves.toEqual(challenge);
+    await expect(resendEmailChange()).resolves.toEqual(challenge);
+    await expect(
+      verifyEmailChange({ newEmail: 'new@example.com', code: '012345' }),
+    ).resolves.toMatchObject({ email: 'new@example.com' });
+
+    expect(fetchMock.mock.calls[1][0]).toContain('/users/me/password');
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      currentPassword: 'current',
+      newPassword: 'new-password',
+    });
+    expect(fetchMock.mock.calls[3][0]).toContain('/users/me/email');
+    expect(fetchMock.mock.calls[5][0]).toContain('/users/me/email/resend');
+    expect(fetchMock.mock.calls[7][0]).toContain('/users/me/email/verify');
+    expect(JSON.parse(fetchMock.mock.calls[7][1].body)).toEqual({
+      newEmail: 'new@example.com',
+      code: '012345',
+    });
   });
 });

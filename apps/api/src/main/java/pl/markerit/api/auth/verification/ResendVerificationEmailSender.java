@@ -25,14 +25,29 @@ public class ResendVerificationEmailSender implements VerificationEmailSender {
 
     @Override
     public void sendVerification(String recipient, String code, boolean polish) {
+        send(recipient,
+                VerificationEmailTemplate.subject(polish),
+                VerificationEmailTemplate.html(code, polish),
+                VerificationEmailTemplate.text(code, polish));
+    }
+
+    @Override
+    public void sendEmailChange(String recipient, String code, boolean polish) {
+        send(recipient,
+                VerificationEmailTemplate.emailChangeSubject(polish),
+                VerificationEmailTemplate.emailChangeHtml(code, polish),
+                VerificationEmailTemplate.emailChangeText(code, polish));
+    }
+
+    private void send(String recipient, String subject, String html, String text) {
         if (apiKey.isBlank()) throw new IllegalStateException("RESEND_API_KEY is required when EMAIL_PROVIDER=resend.");
         client.post().contentType(MediaType.APPLICATION_JSON).header("Authorization", "Bearer " + apiKey)
                 .body(Map.of(
                         "from", "markerIt <" + from + ">",
                         "to", new String[] {recipient},
-                        "subject", VerificationEmailTemplate.subject(polish),
-                        "html", VerificationEmailTemplate.html(code, polish),
-                        "text", VerificationEmailTemplate.text(code, polish)))
+                        "subject", subject,
+                        "html", html,
+                        "text", text))
                 .retrieve().toBodilessEntity();
     }
 }

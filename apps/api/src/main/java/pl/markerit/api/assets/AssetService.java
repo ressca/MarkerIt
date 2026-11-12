@@ -45,6 +45,7 @@ public class AssetService {
 
     public static final int MAX_REVIEW_IMAGES_PER_PROJECT = 8;
     public static final long MAX_ASSET_SIZE_BYTES = 10L * 1024 * 1024;
+    public static final long MAX_AVATAR_SIZE_BYTES = 5L * 1024 * 1024;
     public static final long MAX_IMAGE_PIXELS = 80_000_000L;
     public static final int MAX_IMAGE_DIMENSION = 12_000;
 
@@ -89,6 +90,67 @@ public class AssetService {
         return upload(userId, projectId, file, Asset.PURPOSE_ATTACHMENT);
     }
 
+    @Transactional
+    public AssetResponse uploadAvatar(UUID userId, MultipartFile file) {
+        validate(file, MAX_AVATAR_SIZE_BYTES, true);
+        String contentType = normalizeContentType(file.getContentType());
+        String originalName = normalizeOriginalName(file.getOriginalFilename());
+        StagedFile staged = stage(file, MAX_AVATAR_SIZE_BYTES, true);
+        try {
+            if (staged.size() == 0) {
+                throw new InvalidRequestException("EMPTY_FILE", "Wybierz plik do przesłania.");
+            }
+            validateActualContent(staged.path(), contentType);
+            ImageDimensions dimensions = readDimensions(staged.path());
+
+            StorageService storage = storages.defaultStorage();
+            String storageKey = "avatars/" + userId + "/" + UUID.randomUUID()
+                    + "." + EXTENSIONS.get(contentType);
+            try (InputStream content = Files.newInputStream(staged.path())) {
+                storage.putObject(storageKey, content, staged.size(), contentType);
+            }
+            deleteOnRollback(storage, storageKey);
+
+            Asset asset = Asset.avatar(
+                    userId,
+                    storage.provider(),
+                    storageKey,
+                    originalName,
+                    contentType,
+                    staged.size(),
+                    dimensions.width(),
+                    dimensions.height(),
+                    Map.of("originalName", originalName),
+                    staged.checksumSha256());
+            try {
+                return toResponse(assets.saveAndFlush(asset));
+            } catch (RuntimeException exception) {
+                deleteQuietly(storage, storageKey);
+                throw exception;
+            }
+        } catch (IOException exception) {
+            throw new InvalidRequestException("INVALID_FILE", "Nie udało się odczytać pliku.");
+        } finally {
+            deleteQuietly(staged.path());
+        }
+    }
+
+    /**
+     * Hard-deletes an avatar row and its object. The calling profile service is
+     * responsible for clearing the user reference first.
+     */
+    @Transactional
+    public void deleteAvatarAsset(UUID assetId) {
+        Asset asset = requireAsset(assetId);
+        if (!Asset.PURPOSE_AVATAR.equals(asset.getPurpose())) {
+            return;
+        }
+        assets.delete(asset);
+        assets.flush();
+        StorageService storage = storages.forProvider(asset.getStorageProvider());
+        afterCommitOrNow(() -> deleteStoredObject(storage, asset.getStorageKey()));
+    }
+
     private AssetResponse upload(UUID userId, UUID projectId, MultipartFile file, String purpose) {
         Project project = projects.requireProject(projectId);
         boolean reviewImage = Asset.PURPOSE_REVIEW_IMAGE.equals(purpose);
@@ -102,7 +164,7 @@ public class AssetService {
         } else {
             workspaces.requireMember(project.getWorkspaceId(), userId);
         }
-        validate(file);
+        validate(file, MAX_ASSET_SIZE_BYTES, false);
 
         if (reviewImage
                 && assets.countByProjectIdAndPurposeAndDeletedAtIsNull(projectId, Asset.PURPOSE_REVIEW_IMAGE)
@@ -112,7 +174,7 @@ public class AssetService {
 
         String contentType = normalizeContentType(file.getContentType());
         String originalName = normalizeOriginalName(file.getOriginalFilename());
-        StagedFile staged = stage(file);
+        StagedFile staged = stage(file, MAX_ASSET_SIZE_BYTES, false);
         try {
             if (staged.size() == 0) {
                 throw new InvalidRequestException("EMPTY_FILE", "Wybierz plik do przesłania.");
@@ -189,7 +251,11 @@ public class AssetService {
     @Transactional(readOnly = true)
     public AssetContent content(UUID userId, UUID assetId) {
         Asset asset = requireAsset(assetId);
-        workspaces.requireMember(asset.getWorkspaceId(), userId);
+        // Avatars are intentionally visible to every authenticated user (for
+        // example in workspace member lists). They are not tied to a workspace.
+        if (!Asset.PURPOSE_AVATAR.equals(asset.getPurpose())) {
+            workspaces.requireMember(asset.getWorkspaceId(), userId);
+        }
         byte[] data;
         try {
             data = storages.forProvider(asset.getStorageProvider()).getObject(asset.getStorageKey());
@@ -216,7 +282,9 @@ public class AssetService {
         boolean ownUnreferencedAttachment = Asset.PURPOSE_ATTACHMENT.equals(asset.getPurpose())
                 && userId.equals(asset.getOwnerUserId())
                 && !referenced;
-        if (!ownUnreferencedAttachment) {
+        boolean ownAvatar = Asset.PURPOSE_AVATAR.equals(asset.getPurpose())
+                && userId.equals(asset.getOwnerUserId());
+        if (!ownUnreferencedAttachment && !ownAvatar) {
             workspaces.requireProjectManager(asset.getWorkspaceId(), userId);
         }
 
@@ -243,12 +311,12 @@ public class AssetService {
                         "Nie znaleziono pliku."));
     }
 
-    private void validate(MultipartFile file) {
+    private void validate(MultipartFile file, long maxBytes, boolean avatar) {
         if (file == null || file.isEmpty()) {
             throw new InvalidRequestException("EMPTY_FILE", "Wybierz plik do przesłania.");
         }
-        if (file.getSize() > MAX_ASSET_SIZE_BYTES) {
-            throw assetTooLarge();
+        if (file.getSize() > maxBytes) {
+            throw avatar ? avatarTooLarge() : assetTooLarge();
         }
         if (!ALLOWED_CONTENT_TYPES.contains(normalizeContentType(file.getContentType()))) {
             throw new InvalidRequestException(
@@ -296,7 +364,7 @@ public class AssetService {
         return true;
     }
 
-    private StagedFile stage(MultipartFile file) {
+    private StagedFile stage(MultipartFile file, long maxBytes, boolean avatar) {
         Path temp = null;
         try {
             temp = Files.createTempFile("markerit-upload-", ".tmp");
@@ -312,8 +380,8 @@ public class AssetService {
                 int read;
                 while ((read = input.read(buffer)) != -1) {
                     size += read;
-                    if (size > MAX_ASSET_SIZE_BYTES) {
-                        throw assetTooLarge();
+                    if (size > maxBytes) {
+                        throw avatar ? avatarTooLarge() : assetTooLarge();
                     }
                     output.write(buffer, 0, read);
                 }
@@ -452,6 +520,10 @@ public class AssetService {
 
     private InvalidRequestException assetTooLarge() {
         return new InvalidRequestException("ASSET_TOO_LARGE", "Plik może mieć maksymalnie 10 MB.");
+    }
+
+    private InvalidRequestException avatarTooLarge() {
+        return new InvalidRequestException("AVATAR_TOO_LARGE", "Avatar może mieć maksymalnie 5 MB.");
     }
 
     private LimitReachedException assetLimitReached() {

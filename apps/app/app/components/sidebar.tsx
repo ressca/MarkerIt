@@ -8,6 +8,7 @@ import {
   Archive,
   LogOut,
   MessageSquare,
+  Settings,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -20,6 +21,7 @@ import {
   Badge,
   Avatar,
   AvatarFallback,
+  AvatarImage,
   Card,
   CardContent,
   Separator,
@@ -30,6 +32,8 @@ import {
 } from '@markerit/ui';
 import { logoutAccount } from '@markerit/api-client';
 import { WorkspaceSwitcher } from './workspace-switcher';
+import { SettingsDialog } from './settings/settings-dialog';
+import { useAppLocale } from '../lib/use-app-locale';
 import type { Workspace, UserProfile } from './types';
 import { cn } from 'cn';
 
@@ -64,9 +68,12 @@ export function Sidebar({
   collapsed = false,
   className,
 }: SidebarProps) {
+  const { messages } = useAppLocale();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [profileOverride, setProfileOverride] = useState<UserProfile | null>(null);
 
-  const displayUser = user ?? {
+  const displayUser = profileOverride ?? user ?? {
     id: 'guest',
     email: '',
     displayName: 'Niezalogowany',
@@ -320,6 +327,9 @@ export function Sidebar({
                         size="sm"
                         className="bg-primary/15 font-bold text-xs text-primary"
                       >
+                        {displayUser.avatarUrl && (
+                          <AvatarImage src={displayUser.avatarUrl} alt="" />
+                        )}
                         <AvatarFallback>{displayUser.initials}</AvatarFallback>
                       </Avatar>
                     </DropdownMenuTrigger>
@@ -344,6 +354,9 @@ export function Sidebar({
                 }
               >
                 <Avatar size="sm" className="bg-primary/15 font-bold text-xs text-primary">
+                  {displayUser.avatarUrl && (
+                    <AvatarImage src={displayUser.avatarUrl} alt="" />
+                  )}
                   <AvatarFallback>{displayUser.initials}</AvatarFallback>
                 </Avatar>
                 <span className="min-w-0 flex-1 text-left">
@@ -374,6 +387,11 @@ export function Sidebar({
                 )}
               </div>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+                <Settings />
+                <span>{messages.settings.title}</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 disabled={loggingOut}
                 onClick={handleLogout}
@@ -385,6 +403,12 @@ export function Sidebar({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        <SettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          onProfileUpdated={setProfileOverride}
+        />
       </aside>
     </TooltipProvider>
   );
