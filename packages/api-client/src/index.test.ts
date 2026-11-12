@@ -23,6 +23,7 @@ import {
   listProjectReviews,
   listProjects,
   listReviewPins,
+  listWorkspaceFeedback,
   listWorkspaceMembers,
   listWorkspaces,
   loginAccount,
@@ -353,6 +354,16 @@ describe('project review API operations', () => {
     expect(fetchMock.mock.calls[1][0]).toContain('/projects/p%201/assets');
     expect(fetchMock.mock.calls[2][0]).toContain('/workspaces/ws%2F1/members');
     expect(fetchMock.mock.calls[3][0]).toContain('/projects/p-1/reviews');
+  });
+
+  it('lists workspace feedback across projects', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(json([{ id: 'pin-1' }]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(listWorkspaceFeedback('ws/1')).resolves.toEqual([{ id: 'pin-1' }]);
+
+    expect(fetchMock.mock.calls[0][0]).toContain('/workspaces/ws%2F1/feedback');
+    expect(fetchMock.mock.calls[0][1].method).toBeUndefined();
   });
 
   it('uploads review images and attachments as CSRF-protected multipart', async () => {

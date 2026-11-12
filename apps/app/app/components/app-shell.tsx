@@ -21,6 +21,8 @@ interface AppShellProps {
   workspaceId?: string;
   breadcrumbs: BreadcrumbItem[];
   children: ReactNode;
+  /** Highlights the matching sidebar entry; defaults to the projects view. */
+  activeTab?: string;
 }
 
 interface SidebarStats {
@@ -32,7 +34,13 @@ interface SidebarStats {
 
 const EMPTY_STATS: SidebarStats = { projects: 0, shared: 0, closed: 0, comments: 0 };
 
-export function AppShell({ user, workspaceId, breadcrumbs, children }: AppShellProps) {
+export function AppShell({
+  user,
+  workspaceId,
+  breadcrumbs,
+  children,
+  activeTab = 'projekty',
+}: AppShellProps) {
   const router = useRouter();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState(workspaceId ?? '');
@@ -134,9 +142,13 @@ export function AppShell({ user, workspaceId, breadcrumbs, children }: AppShellP
   }
 
   const sidebarProps = {
-    activeTab: '',
+    activeTab,
     onTabChange: (tab: string) => {
-      router.push(tab === 'shared' ? '/#shared' : '/#projekty');
+      if (tab === 'feedback') {
+        router.push('/feedback');
+      } else {
+        router.push(tab === 'shared' ? '/#shared' : '/#projekty');
+      }
       setMobileMenuOpen(false);
     },
     projectCount: stats.projects,

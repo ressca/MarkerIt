@@ -486,6 +486,44 @@ export function listProjectReviews(projectId: string): Promise<ReviewSummaryDto[
   return apiRequest<ReviewSummaryDto[]>(`projects/${encodeURIComponent(projectId)}/reviews`);
 }
 
+export type WorkspaceFeedbackDto = {
+  id: string;
+  projectId: string;
+  projectName: string;
+  projectTone: ProjectTone;
+  reviewId: string;
+  reviewTitle: string;
+  reviewStatus: ReviewStatus;
+  versionId: string;
+  versionNumber: number;
+  asset?: AssetDto | null;
+  xPercent: number;
+  yPercent: number;
+  status: PinStatus;
+  authorId?: string | null;
+  authorName: string;
+  authorInitials: string;
+  createdAt: string;
+  resolvedBy?: string | null;
+  resolvedByName?: string | null;
+  resolvedAt?: string | null;
+  commentCount: number;
+  lastCommentBody?: string | null;
+  lastCommentAuthorName?: string | null;
+  lastCommentAuthorInitials?: string | null;
+  lastCommentAt?: string | null;
+};
+
+/**
+ * Lists pins from the latest version of every review in the workspace,
+ * including closed reviews, for the workspace feedback inbox.
+ */
+export function listWorkspaceFeedback(workspaceId: string): Promise<WorkspaceFeedbackDto[]> {
+  return apiRequest<WorkspaceFeedbackDto[]>(
+    `workspaces/${encodeURIComponent(workspaceId)}/feedback`,
+  );
+}
+
 export async function createReview(
   projectId: string,
   input: CreateReviewInput,
