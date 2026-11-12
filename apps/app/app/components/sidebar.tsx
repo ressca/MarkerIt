@@ -79,7 +79,7 @@ export function Sidebar({
       label: 'Projekty',
       icon: FolderKanban,
       count: projectCount,
-      href: '#projekty',
+      href: '/#projekty',
     },
     {
       id: 'feedback',
@@ -93,14 +93,14 @@ export function Sidebar({
       label: 'Udostępnione',
       icon: Share2,
       count: sharedCount,
-      href: '#projekty',
+      href: '/#shared',
     },
     {
       id: 'archive',
       label: 'Archiwum',
       icon: Archive,
       count: closedCount,
-      href: '#projekty',
+      href: '/#archive',
     },
   ];
 

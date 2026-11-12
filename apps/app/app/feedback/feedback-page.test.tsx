@@ -76,6 +76,7 @@ const openFeedback: WorkspaceFeedbackDto = {
   resolvedByName: null,
   resolvedAt: null,
   commentCount: 2,
+  noteBody: 'Dodaj logo w prawym górnym rogu.',
   lastCommentBody: 'Skróć margines przy logo.',
   lastCommentAuthorName: 'Jan Nowak',
   lastCommentAuthorInitials: 'JN',
@@ -104,6 +105,7 @@ const resolvedFeedback: WorkspaceFeedbackDto = {
   resolvedByName: user.displayName,
   resolvedAt: '2026-11-10T09:00:00Z',
   commentCount: 1,
+  noteBody: 'Etykieta jest za duża.',
   lastCommentBody: 'Poprawione.',
   lastCommentAuthorName: user.displayName,
   lastCommentAuthorInitials: user.initials,
@@ -142,6 +144,10 @@ describe('FeedbackPage', () => {
     expect(feedbackLinks.length).toBeGreaterThan(0);
     expect(feedbackLinks[0]).toHaveAttribute('aria-current', 'page');
     expect(feedbackLinks[0]).toHaveAttribute('href', '/feedback');
+    expect(screen.getByRole('link', { name: /Projekty/ })).toHaveAttribute(
+      'href',
+      '/#projekty',
+    );
 
     const threadLink = screen.getByRole('link', { name: 'Baner na stronę główną' });
     expect(threadLink).toHaveAttribute('href', '/projects/project-1/reviews/review-1');
@@ -158,7 +164,10 @@ describe('FeedbackPage', () => {
     expect(screen.getByText('Wątek zamknięty')).toBeInTheDocument();
 
     await browser.click(screen.getByRole('tab', { name: /Wszystkie/ }));
-    await browser.type(screen.getByRole('textbox', { name: 'Szukaj w uwagach…' }), 'logo');
+    await browser.type(
+      screen.getByRole('textbox', { name: 'Szukaj w uwagach…' }),
+      'prawym górnym',
+    );
 
     expect(screen.getByText('Baner na stronę główną')).toBeInTheDocument();
     expect(screen.queryByText('Etykieta butelki')).not.toBeInTheDocument();
@@ -196,6 +205,17 @@ describe('FeedbackPage', () => {
     expect(await screen.findByText('Baner na stronę główną')).toBeInTheDocument();
     await waitFor(() => {
       expect(api.listWorkspaces).toHaveBeenCalled();
+      expect(api.listWorkspaceFeedback).toHaveBeenCalledWith(workspace.id);
+    });
+  });
+
+  it('uses the first fixture workspace when no workspace id or feedback is provided', async () => {
+    api.listWorkspaceFeedback.mockResolvedValue([openFeedback]);
+
+    render(<FeedbackPage initialUser={user} initialWorkspaces={[workspace]} />);
+
+    expect(await screen.findByText('Baner na stronę główną')).toBeInTheDocument();
+    await waitFor(() => {
       expect(api.listWorkspaceFeedback).toHaveBeenCalledWith(workspace.id);
     });
   });

@@ -35,6 +35,7 @@ public record WorkspaceFeedbackResponse(
         String resolvedByName,
         Instant resolvedAt,
         int commentCount,
+        String noteBody,
         String lastCommentBody,
         String lastCommentAuthorName,
         String lastCommentAuthorInitials,

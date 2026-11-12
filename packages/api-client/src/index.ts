@@ -508,6 +508,8 @@ export type WorkspaceFeedbackDto = {
   resolvedByName?: string | null;
   resolvedAt?: string | null;
   commentCount: number;
+  /** Body of the pin's original note (its first comment). */
+  noteBody?: string | null;
   lastCommentBody?: string | null;
   lastCommentAuthorName?: string | null;
   lastCommentAuthorInitials?: string | null;

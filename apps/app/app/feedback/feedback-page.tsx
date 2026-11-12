@@ -52,6 +52,12 @@ import { getActiveWorkspaceId } from '../lib/projects-store';
 import { cn } from 'cn';
 
 type StatusFilter = 'OPEN' | 'RESOLVED' | 'ALL';
+type ErrorKind = 'workspaces' | 'feedback' | 'resolve';
+
+interface FeedbackError {
+  cause: unknown;
+  kind: ErrorKind;
+}
 
 interface FeedbackPageProps {
   initialUser: UserProfile;
@@ -70,10 +76,31 @@ const toneDot: Record<ProjectTone, string> = {
   amber: 'bg-amber-600',
 };
 
+function activityValue(item: WorkspaceFeedbackDto): string {
+  const values = [item.lastCommentAt, item.resolvedAt, item.createdAt].filter(
+    (value): value is string => Boolean(value),
+  );
+  return values.reduce(
+    (latest, value) =>
+      new Date(value).getTime() > new Date(latest).getTime() ? value : latest,
+    values[0] ?? '',
+  );
+}
+
 function activityTimestamp(item: WorkspaceFeedbackDto): number {
-  const value = item.lastCommentAt ?? item.resolvedAt ?? item.createdAt;
-  const timestamp = new Date(value).getTime();
+  const timestamp = new Date(activityValue(item)).getTime();
   return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function commentsLabel(count: number, messages: TranslationMessages): string {
+  if (count === 1) return messages.feedback.commentsCountOne;
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  const isFew = mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14);
+  return interpolate(
+    isFew ? messages.feedback.commentsCountFew : messages.feedback.commentsCountMany,
+    { count },
+  );
 }
 
 function interpolate(template: string, values: Record<string, string | number>): string {
@@ -90,47 +117,51 @@ export function FeedbackPage({
   initialFeedback,
 }: FeedbackPageProps) {
   const { locale, messages } = useAppLocale();
+  const initialActiveWorkspaceId = initialWorkspaceId ?? initialWorkspaces?.[0]?.id ?? '';
   const [workspaces, setWorkspaces] = useState<WorkspaceDto[]>(initialWorkspaces ?? []);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState(initialWorkspaceId ?? '');
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState(initialActiveWorkspaceId);
   const [feedback, setFeedback] = useState<WorkspaceFeedbackDto[]>(initialFeedback ?? []);
   const [loading, setLoading] = useState(
-    initialWorkspaces === undefined || initialFeedback === undefined,
+    initialWorkspaces === undefined ||
+      (initialFeedback === undefined && initialActiveWorkspaceId !== ''),
   );
-  const [error, setError] = useState<unknown>(null);
+  const [error, setError] = useState<FeedbackError | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('OPEN');
   const [projectFilter, setProjectFilter] = useState('all');
   const [query, setQuery] = useState('');
-  const [busyPinId, setBusyPinId] = useState<string | null>(null);
+  const [busyPinIds, setBusyPinIds] = useState<Set<string>>(() => new Set());
+
+  const loadWorkspaces = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const loaded = await listWorkspaces();
+      setWorkspaces(loaded);
+      const saved = getActiveWorkspaceId(initialUser.email);
+      const selected = loaded.find((workspace) => workspace.id === saved) ?? loaded[0];
+      setActiveWorkspaceId(selected?.id ?? '');
+      if (!selected) setLoading(false);
+    } catch (cause) {
+      setError({ cause, kind: 'workspaces' });
+      setLoading(false);
+    }
+  }, [initialUser.email]);
 
   useEffect(() => {
     if (initialWorkspaces !== undefined) return;
-
-    let active = true;
-    (async () => {
-      try {
-        const loaded = await listWorkspaces();
-        if (!active) return;
-        setWorkspaces(loaded);
-        const saved = getActiveWorkspaceId(initialUser.email);
-        const selected = loaded.find((workspace) => workspace.id === saved) ?? loaded[0];
-        setActiveWorkspaceId(selected?.id ?? '');
-        if (!selected) setLoading(false);
-      } catch (cause) {
-        if (!active) return;
-        setError(cause);
-        setLoading(false);
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [initialUser.email, initialWorkspaces]);
+    void loadWorkspaces();
+  }, [initialWorkspaces, loadWorkspaces]);
 
   useEffect(() => {
-    if (!activeWorkspaceId) return;
-    if (initialFeedback !== undefined && activeWorkspaceId === initialWorkspaceId) {
+    if (!activeWorkspaceId) {
+      if (initialWorkspaces !== undefined) setLoading(false);
+      return;
+    }
+    const usingInitialFeedback =
+      initialFeedback !== undefined &&
+      (initialWorkspaceId === undefined || activeWorkspaceId === initialWorkspaceId);
+    if (usingInitialFeedback) {
       setLoading(false);
       return;
     }
@@ -144,7 +175,7 @@ export function FeedbackPage({
         if (active) setFeedback(items);
       })
       .catch((cause) => {
-        if (active) setError(cause);
+        if (active) setError({ cause, kind: 'feedback' });
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -153,7 +184,7 @@ export function FeedbackPage({
     return () => {
       active = false;
     };
-  }, [activeWorkspaceId, initialFeedback, initialWorkspaceId]);
+  }, [activeWorkspaceId, initialFeedback, initialWorkspaceId, initialWorkspaces]);
 
   const currentWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaces[0];
@@ -165,7 +196,7 @@ export function FeedbackPage({
     try {
       setFeedback(await listWorkspaceFeedback(activeWorkspaceId));
     } catch (cause) {
-      setError(cause);
+      setError({ cause, kind: 'feedback' });
     } finally {
       setLoading(false);
     }
@@ -173,7 +204,7 @@ export function FeedbackPage({
 
   async function toggleStatus(item: WorkspaceFeedbackDto) {
     if (item.reviewStatus === 'CLOSED') return;
-    setBusyPinId(item.id);
+    setBusyPinIds((previous) => new Set(previous).add(item.id));
     setError(null);
     try {
       const nextStatus = item.status === 'OPEN' ? 'RESOLVED' : 'OPEN';
@@ -197,9 +228,13 @@ export function FeedbackPage({
           : messages.feedback.reopenedNotice,
       );
     } catch (cause) {
-      setError(cause);
+      setError({ cause, kind: 'resolve' });
     } finally {
-      setBusyPinId(null);
+      setBusyPinIds((previous) => {
+        const next = new Set(previous);
+        next.delete(item.id);
+        return next;
+      });
     }
   }
 
@@ -223,7 +258,13 @@ export function FeedbackPage({
         if (statusFilter !== 'ALL' && item.status !== statusFilter) return false;
         if (projectFilter !== 'all' && item.projectId !== projectFilter) return false;
         if (!normalizedQuery) return true;
-        return [item.projectName, item.reviewTitle, item.authorName, item.lastCommentBody]
+        return [
+          item.projectName,
+          item.reviewTitle,
+          item.authorName,
+          item.noteBody,
+          item.lastCommentBody,
+        ]
           .filter((value): value is string => Boolean(value))
           .some((value) => value.toLowerCase().includes(normalizedQuery));
       })
@@ -241,12 +282,26 @@ export function FeedbackPage({
     setQuery('');
   }
 
+  function showAllNotes() {
+    setStatusFilter('ALL');
+    setProjectFilter('all');
+    setQuery('');
+  }
+
   const errorMessage = error
-    ? apiErrorMessage(error, messages, messages.feedback.loadError)
+    ? apiErrorMessage(
+        error.cause,
+        messages,
+        error.kind === 'workspaces'
+          ? messages.feedback.loadWorkspacesError
+          : error.kind === 'resolve'
+            ? messages.feedback.resolveError
+            : messages.feedback.loadError,
+      )
     : null;
-  const showNoWorkspace = !loading && !currentWorkspace;
-  const showEmpty = !loading && Boolean(currentWorkspace) && feedback.length === 0;
-  const showNoResults = !loading && feedback.length > 0 && filtered.length === 0;
+  const showNoWorkspace = !loading && !error && !currentWorkspace;
+  const showEmpty = !loading && !error && Boolean(currentWorkspace) && feedback.length === 0;
+  const showNoResults = !loading && !error && feedback.length > 0 && filtered.length === 0;
 
   return (
     <AppShell
@@ -259,7 +314,7 @@ export function FeedbackPage({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {(currentWorkspace?.name ?? 'Workspace').toUpperCase()} ·{' '}
+              {currentWorkspace ? `${currentWorkspace.name.toUpperCase()} · ` : ''}
               {messages.feedback.eyebrow.toUpperCase()}
             </p>
             <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
@@ -274,8 +329,8 @@ export function FeedbackPage({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => void reload()}
-            disabled={!activeWorkspaceId || loading}
+            onClick={() => void (activeWorkspaceId ? reload() : loadWorkspaces())}
+            disabled={loading}
             className="gap-1.5 self-start sm:self-auto"
           >
             <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
@@ -294,7 +349,7 @@ export function FeedbackPage({
               variant="ghost"
               size="icon-xs"
               onClick={() => setError(null)}
-              aria-label="Zamknij komunikat błędu"
+              aria-label={messages.feedback.closeError}
               className="size-5 shrink-0 text-destructive hover:bg-destructive/15"
             >
               <X className="size-3.5" />
@@ -313,7 +368,7 @@ export function FeedbackPage({
               variant="ghost"
               size="icon-xs"
               onClick={() => setNotice(null)}
-              aria-label="Zamknij powiadomienie"
+              aria-label={messages.feedback.closeNotice}
               className="size-5 shrink-0 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300"
             >
               <X className="size-3.5" />
@@ -375,7 +430,7 @@ export function FeedbackPage({
                     variant="outline"
                     size="sm"
                     className="h-8 max-w-52 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                    aria-label={messages.feedback.projectFilter}
+                    aria-label={`${messages.feedback.projectFilter}: ${selectedProjectName}`}
                   />
                 }
               >
@@ -416,6 +471,12 @@ export function FeedbackPage({
           </div>
         </div>
 
+        {loading && (
+          <p role="status" className="sr-only">
+            {messages.feedback.loading}
+          </p>
+        )}
+
         {!loading && feedback.length > 0 && (
           <p className="text-xs text-muted-foreground">
             {interpolate(messages.feedback.results, {
@@ -442,11 +503,14 @@ export function FeedbackPage({
             title={messages.feedback.emptyFilteredTitle}
             description={messages.feedback.emptyFilteredDescription}
             action={
-              filtersActive ? (
-                <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
-                  {messages.feedback.clearFilters}
-                </Button>
-              ) : null
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={filtersActive ? clearFilters : showAllNotes}
+              >
+                {filtersActive ? messages.feedback.clearFilters : messages.feedback.showAll}
+              </Button>
             }
           />
         ) : (
@@ -457,7 +521,7 @@ export function FeedbackPage({
                 item={item}
                 messages={messages}
                 locale={locale}
-                busy={busyPinId === item.id}
+                busy={busyPinIds.has(item.id)}
                 onToggleStatus={() => void toggleStatus(item)}
               />
             ))}
@@ -510,10 +574,7 @@ function FeedbackRow({
   const threadHref = `/projects/${item.projectId}/reviews/${item.reviewId}`;
   const open = item.status === 'OPEN';
   const reviewClosed = item.reviewStatus === 'CLOSED';
-  const commentLabel =
-    item.commentCount === 1
-      ? messages.feedback.commentsCountOne
-      : interpolate(messages.feedback.commentsCount, { count: item.commentCount });
+  const commentLabel = commentsLabel(item.commentCount, messages);
 
   return (
     <Card
@@ -527,27 +588,19 @@ function FeedbackRow({
               src={assetContentUrl(item.asset.id)}
               alt=""
               loading="lazy"
-              className="size-full object-cover"
+              className="size-full object-contain"
             />
           ) : (
             <span className="flex size-full items-center justify-center text-muted-foreground">
               <ImageIcon className="size-7" />
             </span>
           )}
-          <span
-            aria-hidden="true"
-            className={cn(
-              'absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-md',
-              open ? 'bg-amber-500' : 'bg-emerald-500',
-            )}
-            style={{ left: `${item.xPercent}%`, top: `${item.yPercent}%` }}
-          />
           <Badge
             variant="secondary"
             className={cn(
               'absolute left-2 top-2 px-1.5 py-0 text-[10px] font-semibold shadow-xs',
               open
-                ? 'bg-amber-500/95 text-white'
+                ? 'bg-amber-600/95 text-white'
                 : 'bg-emerald-600/95 text-white',
             )}
           >
@@ -632,7 +685,7 @@ function FeedbackRow({
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
             <span>{item.authorName}</span>
-            <span>{formatDateTime(item.createdAt, locale)}</span>
+            <span>{formatDateTime(activityValue(item), locale)}</span>
             <span className="inline-flex items-center gap-1">
               <MessageSquare className="size-3" />
               {commentLabel}

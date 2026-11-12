@@ -143,14 +143,10 @@ export function AppShell({
 
   const sidebarProps = {
     activeTab,
-    onTabChange: (tab: string) => {
-      if (tab === 'feedback') {
-        router.push('/feedback');
-      } else {
-        router.push(tab === 'shared' ? '/#shared' : '/#projekty');
-      }
-      setMobileMenuOpen(false);
-    },
+    // Navigation is handled by the sidebar links themselves. Pushing here as
+    // well would resolve hash-only hrefs against the current page and could
+    // strand the user on a non-dashboard route.
+    onTabChange: () => setMobileMenuOpen(false),
     projectCount: stats.projects,
     sharedCount: stats.shared,
     closedCount: stats.closed,

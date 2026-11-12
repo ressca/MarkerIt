@@ -103,6 +103,7 @@ class WorkspaceFeedbackServiceTest {
         assertEquals("Anna Kowalska", first.authorName());
         assertEquals("AK", first.authorInitials());
         assertEquals(2, first.commentCount());
+        assertEquals("Pierwsza uwaga", first.noteBody());
         assertEquals("Skróć margines", first.lastCommentBody());
         assertEquals("Jan Nowak", first.lastCommentAuthorName());
         assertEquals("JN", first.lastCommentAuthorInitials());

@@ -50,6 +50,7 @@ class WorkspaceFeedbackControllerTest {
                 null,
                 null,
                 1,
+                "Dodaj logo",
                 "Skróć margines",
                 "Jan Nowak",
                 "JN",

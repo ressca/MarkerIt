@@ -165,6 +165,7 @@ public class WorkspaceFeedbackService {
                     pin.getResolvedBy() == null ? null : displayName(pin.getResolvedBy(), usersById),
                     pin.getResolvedAt(),
                     thread.size(),
+                    thread.isEmpty() ? null : thread.getFirst().getBody(),
                     lastComment == null ? null : lastComment.getBody(),
                     lastAuthorName,
                     lastAuthorName == null ? null : initials(lastAuthorName),
