@@ -241,6 +241,22 @@ Bez zmian pozostają: `id`, `email`, `password_hash`, `email_verified`, `created
 
 Bez zmian. Indeksy już istnieją.
 
+#### `email_change_requests`
+
+Oczekująca zmiana adresu e-mail, jedna na użytkownika:
+
+| Kolumna | Typ | Ograniczenia |
+| --- | --- | --- |
+| `user_id` | `UUID` | PK, `REFERENCES users(id) ON DELETE CASCADE` |
+| `new_email` | `VARCHAR(320)` | `NOT NULL` |
+| `code_hash` | `VARCHAR(64)` | `NOT NULL` |
+| `expires_at`, `last_sent_at`, `send_window_started_at` | `TIMESTAMPTZ` | `NOT NULL` |
+| `sends_in_window` | `INTEGER` | `NOT NULL DEFAULT 1` |
+| `failed_attempts` | `INTEGER` | `NOT NULL DEFAULT 0` |
+
+Kod trafia wyłącznie na nowy adres; zmiana jest stosowana po jego potwierdzeniu.
+Migracja `V12`.
+
 ### 5.2. Etap 1 — workspace i projekty (potrzebne dla obecnego dashboardu)
 
 #### `workspaces`
@@ -681,8 +697,9 @@ Limity są egzekwowane w serwisach oraz triggerami w bazie:
   na assecie. W danej konfiguracji istnieje jednak tylko backend wskazany przez
   `STORAGE_PROVIDER`, więc zmiana providera bez migracji obiektów sprawia, że
   starsze pliki stają się nieczytelne (brak automatycznej migracji).
-- Zdjęcia profilowe: schemat rezerwuje `assets.purpose = 'AVATAR'` i
-  `users.avatar_asset_id`, ale upload awatarów nie jest jeszcze zaimplementowany.
+- Zdjęcia profilowe: `assets.purpose = 'AVATAR'` i `users.avatar_asset_id`.
+  Upload obsługuje PNG/JPEG do 5 MB, a odczyt avatara jest dostępny dla każdego
+  zalogowanego użytkownika.
 - Zdjęcia do review: `assets.purpose = 'REVIEW_IMAGE'`, podpięte przez
   `review_version_assets`.
 - Miniatury/preview: `asset_variants`.
@@ -705,6 +722,5 @@ Limity są egzekwowane w serwisach oraz triggerami w bazie:
 5. Wszystkie tabele od razu. ✅
 6. Bez billingu. ✅
 7. Bez importu danych z `localStorage` — startujemy od nowa. ✅
-8. `display_name` i `avatar_asset_id` w `users`; awatary są zarezerwowane
-   w schemacie, ale ich upload nie jest jeszcze wdrożony. Pliki review trafiają
-   do magazynu S3/R2. ✅
+8. `display_name` i `avatar_asset_id` w `users`; upload awatarów jest wdrożony
+   (PNG/JPEG do 5 MB). Pliki review i awatary trafiają do magazynu S3/R2/LOCAL. ✅

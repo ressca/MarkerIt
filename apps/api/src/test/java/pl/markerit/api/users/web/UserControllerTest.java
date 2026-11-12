@@ -12,9 +12,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.jwt.Jwt;
+import pl.markerit.api.auth.InvalidCredentialsException;
 import pl.markerit.api.auth.session.AuthSessionService;
 import pl.markerit.api.auth.verification.EmailChangeService;
 import pl.markerit.api.auth.verification.VerificationException;
+import pl.markerit.api.auth.web.LoginRateLimitException;
+import pl.markerit.api.auth.web.LoginRateLimiter;
+import pl.markerit.api.realtime.RealtimeSessionRegistry;
 import pl.markerit.api.security.SecurityConfiguration;
 import pl.markerit.api.users.ProfileService;
 import pl.markerit.api.users.User;
@@ -24,6 +28,8 @@ class UserControllerTest {
     private ProfileService profiles;
     private EmailChangeService emailChanges;
     private AuthSessionService sessions;
+    private LoginRateLimiter rateLimiter;
+    private RealtimeSessionRegistry realtimeSessions;
     private UserController controller;
     private UUID userId;
     private UUID sessionId;
@@ -34,7 +40,11 @@ class UserControllerTest {
         profiles = mock(ProfileService.class);
         emailChanges = mock(EmailChangeService.class);
         sessions = mock(AuthSessionService.class);
-        controller = new UserController(profiles, emailChanges, sessions, false, Duration.ofHours(12));
+        rateLimiter = mock(LoginRateLimiter.class);
+        realtimeSessions = mock(RealtimeSessionRegistry.class);
+        when(rateLimiter.allow(any(), anyString(), any())).thenReturn(true);
+        controller = new UserController(
+                profiles, emailChanges, sessions, rateLimiter, realtimeSessions, false);
         userId = UUID.randomUUID();
         sessionId = UUID.randomUUID();
         jwt = Jwt.withTokenValue("token")
@@ -74,6 +84,18 @@ class UserControllerTest {
         verify(sessions).refresh(sessionId, user);
     }
 
+    @Test void returnsTheUpdatedProfileWhenTheSessionExpiresDuringRefresh() {
+        when(profiles.updateProfile(eq(userId), any())).thenReturn(user);
+        when(sessions.refresh(eq(sessionId), eq(user)))
+                .thenThrow(new InvalidCredentialsException());
+
+        var response = controller.update(jwt, new UpdateProfileRequest("Anna Nowak", null));
+
+        assertEquals(200, response.getStatusCode().value());
+        assertNull(response.getHeaders().getFirst(HttpHeaders.SET_COOKIE));
+        assertEquals("Anna Kowalska", response.getBody().displayName());
+    }
+
     @Test void uploadsAndDeletesAvatar() {
         when(profiles.updateAvatar(eq(userId), any())).thenReturn(user);
         when(profiles.removeAvatar(userId)).thenReturn(user);
@@ -87,11 +109,29 @@ class UserControllerTest {
         verify(profiles).removeAvatar(userId);
     }
 
-    @Test void changesPasswordAndRevokesOtherSessions() {
-        controller.changePassword(jwt, new ChangePasswordRequest("current", "new-password"));
+    @Test void changesPasswordAndClosesRevokedRealtimeSessions() {
+        UUID otherSession = UUID.randomUUID();
+        when(profiles.changePassword(userId, sessionId, "current", "new-password"))
+                .thenReturn(java.util.List.of(otherSession));
 
-        verify(profiles).changePassword(userId, "current", "new-password");
-        verify(sessions).revokeOtherSessions(userId, sessionId);
+        controller.changePassword(
+                jwt, new ChangePasswordRequest("current", "new-password"), new MockHttpServletRequest());
+
+        verify(profiles).changePassword(userId, sessionId, "current", "new-password");
+        verify(realtimeSessions).closeAuthSession(otherSession.toString());
+    }
+
+    @Test void rateLimitsPasswordAndEmailChanges() {
+        when(rateLimiter.allow(any(), anyString(), any())).thenReturn(false);
+        when(rateLimiter.retryAfterSeconds(any(), anyString(), any())).thenReturn(42L);
+
+        assertThrows(LoginRateLimitException.class, () -> controller.changePassword(
+                jwt, new ChangePasswordRequest("current", "new-password"), new MockHttpServletRequest()));
+        assertThrows(LoginRateLimitException.class, () -> controller.requestEmailChange(
+                jwt,
+                new ChangeEmailRequest("new@example.com", "current"),
+                new MockHttpServletRequest()));
+        verify(profiles, never()).changePassword(any(), any(), any(), any());
     }
 
     @Test void requestsAndResendsEmailChange() {
@@ -104,6 +144,7 @@ class UserControllerTest {
 
         var requested = controller.requestEmailChange(
                 jwt, new ChangeEmailRequest("new@example.com", "current"), new MockHttpServletRequest());
+        verify(rateLimiter).allow(any(), eq("settings:" + userId), any());
         var resent = controller.resendEmailChange(jwt, new MockHttpServletRequest());
 
         assertEquals("new@example.com", requested.email());

@@ -21,8 +21,8 @@ export function setAppLocale(locale: Locale): void {
 /**
  * Reads the interface language selected in the app.
  *
- * Language switching UI ships in a later step; until then `pl` is the
- * fallback and `markerit-locale` is the single source of truth.
+ * `markerit-locale` is the local source of truth; the account locale seeds it
+ * on first render and account settings can change it at any time.
  */
 export function useAppLocale() {
   const [locale, setLocale] = useState<Locale>(DEFAULT_APP_LOCALE);

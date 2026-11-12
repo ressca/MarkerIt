@@ -13,6 +13,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.markerit.api.auth.EmailAlreadyRegisteredException;
@@ -24,7 +25,8 @@ import pl.markerit.api.users.UserService;
 /**
  * Sends and verifies the one-time code used to move an account to a new email
  * address. The code always goes to the requested new address; the current
- * password is required before a request is created.
+ * password is required before a request is created. Existing addresses are
+ * rejected up front, matching the registration flow's product behaviour.
  */
 @Service
 public class EmailChangeService {
@@ -77,7 +79,7 @@ public class EmailChangeService {
         }
 
         Instant now = Instant.now();
-        Optional<EmailChangeRequest> previous = requests.findById(userId);
+        Optional<EmailChangeRequest> previous = requests.findByUserIdForUpdate(userId);
         enforceResendLimits(previous, now);
 
         String code = newCode();
@@ -102,7 +104,7 @@ public class EmailChangeService {
     @Transactional
     public Delivery resend(UUID userId, boolean polish) {
         users.requireUser(userId);
-        EmailChangeRequest request = requests.findById(userId)
+        EmailChangeRequest request = requests.findByUserIdForUpdate(userId)
                 .orElseThrow(() -> new InvalidRequestException(
                         "EMAIL_CHANGE_NOT_REQUESTED",
                         "Najpierw rozpocznij zmianę adresu e-mail."));
@@ -125,7 +127,7 @@ public class EmailChangeService {
     public VerificationResult verify(UUID userId, String newEmail, String suppliedCode) {
         User user = users.requireUser(userId);
         String normalizedEmail = normalizeEmail(newEmail);
-        Optional<EmailChangeRequest> stored = requests.findById(userId);
+        Optional<EmailChangeRequest> stored = requests.findByUserIdForUpdate(userId);
         if (stored.isEmpty()) {
             return VerificationResult.INVALID;
         }
@@ -135,7 +137,8 @@ public class EmailChangeService {
             return VerificationResult.INVALID;
         }
         if (!request.getExpiresAt().isAfter(now)) {
-            requests.delete(request);
+            // Keep the row so the client can request a replacement code
+            // without going through the whole change-email form again.
             return VerificationResult.EXPIRED;
         }
         if (request.getFailedAttempts() >= MAX_FAILED_ATTEMPTS) {
@@ -155,7 +158,13 @@ public class EmailChangeService {
         }
 
         user.changeEmail(normalizedEmail);
-        userRepository.save(user);
+        try {
+            userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException exception) {
+            // Another account claimed the address after the existsByEmail
+            // check; expose the same conflict as the normal duplicate path.
+            throw new EmailAlreadyRegisteredException();
+        }
         requests.delete(request);
         return VerificationResult.VERIFIED;
     }

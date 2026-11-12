@@ -10,5 +10,3 @@ CREATE TABLE email_change_requests (
     sends_in_window INTEGER NOT NULL DEFAULT 1,
     failed_attempts INTEGER NOT NULL DEFAULT 0
 );
-
-CREATE INDEX email_change_requests_email_idx ON email_change_requests (lower(new_email));

@@ -12,6 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import pl.markerit.api.assets.AssetService;
 import pl.markerit.api.assets.web.AssetResponse;
 import pl.markerit.api.auth.PasswordPolicyException;
+import pl.markerit.api.auth.session.AuthSessionService;
 import pl.markerit.api.common.InvalidRequestException;
 import pl.markerit.api.users.web.UpdateProfileRequest;
 
@@ -21,6 +22,7 @@ class ProfileServiceTest {
     private UserRepository repository;
     private PasswordEncoder passwords;
     private AssetService assets;
+    private AuthSessionService sessions;
     private ProfileService service;
     private UUID userId;
     private User user;
@@ -30,11 +32,13 @@ class ProfileServiceTest {
         repository = mock(UserRepository.class);
         passwords = mock(PasswordEncoder.class);
         assets = mock(AssetService.class);
-        service = new ProfileService(users, repository, passwords, assets);
+        sessions = mock(AuthSessionService.class);
+        service = new ProfileService(users, repository, passwords, assets, sessions);
         userId = UUID.randomUUID();
         user = new User("anna@example.com", "old-hash");
         user.setTimestamps();
         when(users.requireUser(userId)).thenReturn(user);
+        when(users.requireUserForUpdate(userId)).thenReturn(user);
         when(repository.save(any(User.class))).thenAnswer(call -> call.getArgument(0));
     }
 
@@ -92,23 +96,29 @@ class ProfileServiceTest {
     }
 
     @Test void changingPasswordRequiresTheCurrentPassword() {
+        UUID sessionId = UUID.randomUUID();
         when(users.verifyPassword(userId, "wrong")).thenReturn(false);
 
         InvalidRequestException exception = assertThrows(InvalidRequestException.class,
-                () -> service.changePassword(userId, "wrong", "new-password"));
+                () -> service.changePassword(userId, sessionId, "wrong", "new-password"));
 
         assertEquals("CURRENT_PASSWORD_INVALID", exception.getCode());
         verify(passwords, never()).encode(anyString());
     }
 
-    @Test void changesPasswordWhenTheCurrentPasswordMatches() {
+    @Test void changesPasswordAndRevokesOtherSessions() {
+        UUID sessionId = UUID.randomUUID();
         when(users.verifyPassword(userId, "current-password")).thenReturn(true);
         when(passwords.encode("new-password")).thenReturn("new-hash");
+        when(sessions.revokeOtherSessions(userId, sessionId))
+                .thenReturn(java.util.List.of(UUID.randomUUID()));
 
-        service.changePassword(userId, "current-password", "new-password");
+        var revoked = service.changePassword(userId, sessionId, "current-password", "new-password");
 
+        assertEquals(1, revoked.size());
         assertEquals("new-hash", user.getPasswordHash());
         verify(repository).save(user);
+        verify(sessions).revokeOtherSessions(userId, sessionId);
     }
 
     @Test void rejectsPasswordLongerThan72Utf8Bytes() {
@@ -117,7 +127,7 @@ class ProfileServiceTest {
         when(users.verifyPassword(userId, "current-password")).thenReturn(true);
 
         assertThrows(PasswordPolicyException.class,
-                () -> service.changePassword(userId, "current-password", tooLong));
+                () -> service.changePassword(userId, UUID.randomUUID(), "current-password", tooLong));
     }
 
     private static AssetResponse assetResponse(UUID id) {

@@ -113,6 +113,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler(InvalidRequestException.class)
     ResponseEntity<ProblemDetail> invalidRequest(InvalidRequestException exception) {
         HttpStatus status = "ASSET_TOO_LARGE".equals(exception.getCode())
+                        || "AVATAR_TOO_LARGE".equals(exception.getCode())
                 ? HttpStatus.CONTENT_TOO_LARGE
                 : HttpStatus.BAD_REQUEST;
         return ResponseEntity.status(status)

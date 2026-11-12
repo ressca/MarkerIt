@@ -1,6 +1,7 @@
 package pl.markerit.api.users;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -10,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 import pl.markerit.api.assets.AssetService;
 import pl.markerit.api.assets.web.AssetResponse;
 import pl.markerit.api.auth.PasswordPolicyException;
+import pl.markerit.api.auth.session.AuthSessionService;
 import pl.markerit.api.common.InvalidRequestException;
 import pl.markerit.api.users.web.UpdateProfileRequest;
 import pl.markerit.api.users.web.UserProfileResponse;
@@ -21,16 +23,19 @@ public class ProfileService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AssetService assets;
+    private final AuthSessionService sessions;
 
     public ProfileService(
             UserService users,
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            AssetService assets) {
+            AssetService assets,
+            AuthSessionService sessions) {
         this.users = users;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.assets = assets;
+        this.sessions = sessions;
     }
 
     @Transactional(readOnly = true)
@@ -63,7 +68,7 @@ public class ProfileService {
 
     @Transactional
     public User updateAvatar(UUID userId, MultipartFile file) {
-        User user = users.requireUser(userId);
+        User user = users.requireUserForUpdate(userId);
         UUID previousAvatarId = user.getAvatarAssetId();
         AssetResponse uploaded = assets.uploadAvatar(userId, file);
         user.setAvatarAssetId(uploaded.id());
@@ -76,7 +81,7 @@ public class ProfileService {
 
     @Transactional
     public User removeAvatar(UUID userId) {
-        User user = users.requireUser(userId);
+        User user = users.requireUserForUpdate(userId);
         UUID previousAvatarId = user.getAvatarAssetId();
         user.setAvatarAssetId(null);
         User saved = userRepository.save(user);
@@ -86,8 +91,14 @@ public class ProfileService {
         return saved;
     }
 
+    /**
+     * Changes the password and revokes every other active session in the same
+     * transaction. Returns the revoked session ids so the caller can close
+     * their realtime connections after the commit.
+     */
     @Transactional
-    public void changePassword(UUID userId, String currentPassword, String newPassword) {
+    public List<UUID> changePassword(
+            UUID userId, UUID currentSessionId, String currentPassword, String newPassword) {
         User user = users.requireUser(userId);
         if (!users.verifyPassword(userId, currentPassword)) {
             throw new InvalidRequestException(
@@ -99,6 +110,7 @@ public class ProfileService {
         }
         user.changePasswordHash(passwordEncoder.encode(newPassword));
         userRepository.save(user);
+        return sessions.revokeOtherSessions(userId, currentSessionId);
     }
 
     public UserProfileResponse toResponse(User user) {

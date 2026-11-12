@@ -33,6 +33,7 @@ import {
 import { logoutAccount } from '@markerit/api-client';
 import { WorkspaceSwitcher } from './workspace-switcher';
 import { SettingsDialog } from './settings/settings-dialog';
+import { useAppLocale } from '../lib/use-app-locale';
 import type { Workspace, UserProfile } from './types';
 import { cn } from 'cn';
 
@@ -67,6 +68,7 @@ export function Sidebar({
   collapsed = false,
   className,
 }: SidebarProps) {
+  const { messages } = useAppLocale();
   const [loggingOut, setLoggingOut] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOverride, setProfileOverride] = useState<UserProfile | null>(null);
@@ -387,7 +389,7 @@ export function Sidebar({
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
                 <Settings />
-                <span>Ustawienia</span>
+                <span>{messages.settings.title}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

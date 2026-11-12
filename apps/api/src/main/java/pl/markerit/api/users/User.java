@@ -155,6 +155,9 @@ public class User {
 
     public void changeEmail(String email) {
         this.email = email.trim().toLowerCase(java.util.Locale.ROOT);
+        // The change is only applied after the one-time code sent to the new
+        // address was verified, so the address is verified by definition.
+        this.emailVerified = true;
         this.updatedAt = Instant.now();
     }
 

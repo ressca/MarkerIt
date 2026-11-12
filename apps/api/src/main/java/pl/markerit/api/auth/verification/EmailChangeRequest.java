@@ -90,13 +90,15 @@ public class EmailChangeRequest {
         if (!sendWindowStartedAt.plusSeconds(3600).isAfter(now)) {
             sendWindowStartedAt = now;
             sendsInWindow = 0;
+            // Only a fresh send window clears the brute-force counter. A
+            // resend within the same window must not reset failed attempts.
+            failedAttempts = 0;
         }
         sendsInWindow++;
         this.newEmail = newEmail;
         codeHash = nextHash;
         lastSentAt = now;
         expiresAt = nextExpiry;
-        failedAttempts = 0;
     }
 
     public void countFailedAttempt() {

@@ -14,6 +14,7 @@ import {
 } from '@markerit/ui';
 import { CheckCircle2, KeyRound, Mail } from 'lucide-react';
 import {
+  ApiError,
   changeMyPassword,
   requestEmailChange,
   resendEmailChange,
@@ -315,7 +316,7 @@ function EmailChangeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent closeLabel={messages.settings.cancel}>
+      <DialogContent closeLabel={messages.settings.close}>
         <DialogHeader>
           <DialogTitle>{messages.settings.emailChangeTitle}</DialogTitle>
           <DialogDescription>{messages.settings.emailChangeDescription}</DialogDescription>
@@ -405,9 +406,10 @@ function EmailCodeDialog({
   const [availableAt, setAvailableAt] = useState(Date.parse(challenge.resendAvailableAt));
 
   useEffect(() => {
+    if (!open) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [open]);
 
   useEffect(() => {
     setAvailableAt(Date.parse(challenge.resendAvailableAt));
@@ -427,6 +429,7 @@ function EmailCodeDialog({
       const profile = await verifyEmailChange({ newEmail: challenge.email, code });
       onVerified(profile);
     } catch (cause) {
+      applyRetryAfter(cause);
       setError(settingsErrorMessage(cause, messages));
     } finally {
       setBusy(false);
@@ -443,15 +446,22 @@ function EmailCodeDialog({
       setCode('');
       setNotice(messages.settings.codeResent);
     } catch (cause) {
+      applyRetryAfter(cause);
       setError(settingsErrorMessage(cause, messages));
     } finally {
       setResending(false);
     }
   }
 
+  function applyRetryAfter(cause: unknown) {
+    if (cause instanceof ApiError && cause.retryAfterSeconds) {
+      setAvailableAt(Date.now() + cause.retryAfterSeconds * 1000);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent closeLabel={messages.settings.cancel} className="sm:max-w-md">
+      <DialogContent closeLabel={messages.settings.close} className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle2 className="size-5 text-primary" />
@@ -496,14 +506,14 @@ function EmailCodeDialog({
               type="button"
               variant="link"
               size="sm"
-              disabled={resending || secondsLeft > 0}
+              disabled={busy || resending || secondsLeft > 0}
               onClick={() => void resend()}
             >
               {secondsLeft > 0
                 ? `${messages.settings.resendIn} ${secondsLeft}s`
                 : messages.settings.resendCode}
             </Button>
-            <Button type="submit" size="sm" disabled={busy}>
+            <Button type="submit" size="sm" disabled={busy || resending}>
               {busy ? messages.settings.verifyingCode : messages.settings.verifyEmailCode}
             </Button>
           </div>

@@ -29,6 +29,9 @@ describe('settingsErrorMessage', () => {
     expect(settingsErrorMessage(apiError('OTP_EXPIRED'), messages)).toBe(
       messages.settings.emailCodeExpired,
     );
+    expect(settingsErrorMessage(apiError('LOGIN_RATE_LIMITED'), messages)).toBe(
+      messages.settings.tooManyAttempts,
+    );
   });
 
   it('maps avatar, network and unknown failures', () => {

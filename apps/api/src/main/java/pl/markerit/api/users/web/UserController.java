@@ -23,10 +23,14 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import pl.markerit.api.auth.InvalidCredentialsException;
 import pl.markerit.api.auth.session.AuthSessionService;
 import pl.markerit.api.auth.verification.EmailChangeService;
 import pl.markerit.api.auth.verification.VerificationException;
+import pl.markerit.api.auth.web.LoginRateLimitException;
+import pl.markerit.api.auth.web.LoginRateLimiter;
 import pl.markerit.api.common.CurrentUser;
+import pl.markerit.api.realtime.RealtimeSessionRegistry;
 import pl.markerit.api.security.SecurityConfiguration;
 import pl.markerit.api.users.ProfileService;
 import pl.markerit.api.users.User;
@@ -38,20 +42,23 @@ public class UserController {
     private final ProfileService profiles;
     private final EmailChangeService emailChanges;
     private final AuthSessionService sessions;
+    private final LoginRateLimiter rateLimiter;
+    private final RealtimeSessionRegistry realtimeSessions;
     private final boolean secureCookie;
-    private final Duration tokenLifetime;
 
     public UserController(
             ProfileService profiles,
             EmailChangeService emailChanges,
             AuthSessionService sessions,
-            @Value("${app.security.auth-cookie-secure:false}") boolean secureCookie,
-            @Value("${app.security.jwt-lifetime:PT12H}") Duration tokenLifetime) {
+            LoginRateLimiter rateLimiter,
+            RealtimeSessionRegistry realtimeSessions,
+            @Value("${app.security.auth-cookie-secure:false}") boolean secureCookie) {
         this.profiles = profiles;
         this.emailChanges = emailChanges;
         this.sessions = sessions;
+        this.rateLimiter = rateLimiter;
+        this.realtimeSessions = realtimeSessions;
         this.secureCookie = secureCookie;
-        this.tokenLifetime = tokenLifetime;
     }
 
     @GetMapping("/me")
@@ -85,10 +92,20 @@ public class UserController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void changePassword(
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody ChangePasswordRequest request) {
-        profiles.changePassword(
-                CurrentUser.id(jwt), request.currentPassword(), request.newPassword());
-        sessions.revokeOtherSessions(CurrentUser.id(jwt), UUID.fromString(jwt.getId()));
+            @Valid @RequestBody ChangePasswordRequest request,
+            HttpServletRequest httpRequest) {
+        UUID userId = CurrentUser.id(jwt);
+        enforceSensitiveActionRateLimit(httpRequest, userId);
+        var revoked = profiles.changePassword(
+                userId,
+                UUID.fromString(jwt.getId()),
+                request.currentPassword(),
+                request.newPassword());
+        // Database sessions are revoked inside the password transaction; the
+        // already-open STOMP connections need to be closed separately.
+        for (UUID sessionId : revoked) {
+            realtimeSessions.closeAuthSession(sessionId.toString());
+        }
     }
 
     @PostMapping("/me/email")
@@ -97,8 +114,10 @@ public class UserController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ChangeEmailRequest request,
             HttpServletRequest httpRequest) {
+        UUID userId = CurrentUser.id(jwt);
+        enforceSensitiveActionRateLimit(httpRequest, userId);
         var delivery = emailChanges.request(
-                CurrentUser.id(jwt),
+                userId,
                 request.newEmail(),
                 request.currentPassword(),
                 isPolish(httpRequest));
@@ -137,19 +156,35 @@ public class UserController {
     }
 
     private ResponseEntity<UserProfileResponse> withRefreshedSession(Jwt jwt, User user) {
-        AuthSessionService.RefreshedToken refreshed =
-                sessions.refresh(UUID.fromString(jwt.getId()), user);
+        AuthSessionService.RefreshedToken refreshed;
+        try {
+            refreshed = sessions.refresh(UUID.fromString(jwt.getId()), user);
+        } catch (InvalidCredentialsException exception) {
+            // The profile mutation already committed. Let the client keep the
+            // new profile; the next request will require a fresh login.
+            return ResponseEntity.ok(profiles.toResponse(user));
+        }
+        Duration maxAge = Duration.between(Instant.now(), refreshed.expiresAt());
         ResponseCookie cookie = ResponseCookie
                 .from(SecurityConfiguration.SESSION_COOKIE, refreshed.token())
                 .httpOnly(true)
                 .secure(secureCookie)
                 .sameSite("Strict")
                 .path("/")
-                .maxAge(tokenLifetime)
+                .maxAge(maxAge.isNegative() ? Duration.ZERO : maxAge)
                 .build();
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(profiles.toResponse(user));
+    }
+
+    private void enforceSensitiveActionRateLimit(HttpServletRequest request, UUID userId) {
+        Instant now = Instant.now();
+        String key = "settings:" + userId;
+        if (!rateLimiter.allow(request.getRemoteAddr(), key, now)) {
+            throw new LoginRateLimitException(
+                    rateLimiter.retryAfterSeconds(request.getRemoteAddr(), key, now));
+        }
     }
 
     private boolean isPolish(HttpServletRequest request) {

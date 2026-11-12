@@ -42,7 +42,8 @@ class EmailChangeServiceTest {
         stored = new AtomicReference<>();
         when(users.requireUser(userId)).thenReturn(user);
         when(users.verifyPassword(userId, "current-password")).thenReturn(true);
-        when(requests.findById(userId)).thenAnswer(call -> Optional.ofNullable(stored.get()));
+        when(requests.findByUserIdForUpdate(userId))
+                .thenAnswer(call -> Optional.ofNullable(stored.get()));
         when(requests.save(any(EmailChangeRequest.class))).thenAnswer(call -> {
             EmailChangeRequest request = call.getArgument(0);
             stored.set(request);
@@ -50,6 +51,7 @@ class EmailChangeServiceTest {
         });
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
         when(userRepository.save(any(User.class))).thenAnswer(call -> call.getArgument(0));
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(call -> call.getArgument(0));
     }
 
     @Test void requestsCodeForTheNewAddressAndRequiresCurrentPassword() {
@@ -105,7 +107,7 @@ class EmailChangeServiceTest {
 
         assertEquals(EmailChangeService.VerificationResult.VERIFIED, result);
         verify(user).changeEmail("new@example.com");
-        verify(userRepository).save(user);
+        verify(userRepository).saveAndFlush(user);
         verify(requests).delete(stored.get());
     }
 
@@ -131,11 +133,23 @@ class EmailChangeServiceTest {
         assertEquals(
                 EmailChangeService.VerificationResult.EXPIRED,
                 service.verify(userId, "new@example.com", "123456"));
+        verify(requests, never()).delete(any());
 
         stored.set(null);
         assertEquals(
                 EmailChangeService.VerificationResult.INVALID,
                 service.verify(userId, "new@example.com", "123456"));
+    }
+
+    @Test void mapsAnEmailUniquenessRaceToTheDuplicateAccountError() {
+        var delivery = service.request(userId, "new@example.com", "current-password", false);
+        String code = publishedCode();
+        when(userRepository.saveAndFlush(any(User.class)))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate"));
+
+        assertThrows(EmailAlreadyRegisteredException.class,
+                () -> service.verify(userId, delivery.email(), code));
+        verify(requests, never()).delete(any());
     }
 
     @Test void resendsToThePendingAddress() {

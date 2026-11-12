@@ -75,14 +75,17 @@ public class AuthSessionService {
     }
 
     @Transactional
-    public void revokeOtherSessions(UUID userId, UUID currentSessionId) {
+    public java.util.List<UUID> revokeOtherSessions(UUID userId, UUID currentSessionId) {
         Instant now = Instant.now();
+        java.util.List<UUID> revoked = new java.util.ArrayList<>();
         for (UserSession session : sessions.findByUser_IdAndRevokedAtIsNull(userId)) {
             if (!session.getId().equals(currentSessionId)) {
                 session.revoke(now);
                 sessions.save(session);
+                revoked.add(session.getId());
             }
         }
+        return revoked;
     }
 
     @Transactional(readOnly = true)

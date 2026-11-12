@@ -14,6 +14,16 @@ export function settingsErrorMessage(
   }
 
   switch (cause.code) {
+    case 'INVALID_DISPLAY_NAME':
+      return messages.settings.displayNameTooShort;
+    case 'INVALID_REQUEST': {
+      const fields = new Set(cause.fieldErrors.map((error) => error.field));
+      if (fields.has('displayName')) return messages.settings.displayNameTooShort;
+      if (fields.has('newEmail')) return messages.settings.emailInvalid;
+      if (fields.has('currentPassword')) return messages.settings.currentPasswordInvalid;
+      if (fields.has('newPassword')) return messages.settings.passwordTooShort;
+      return messages.settings.genericError;
+    }
     case 'CURRENT_PASSWORD_INVALID':
       return messages.settings.currentPasswordInvalid;
     case 'EMAIL_UNCHANGED':
@@ -28,9 +38,10 @@ export function settingsErrorMessage(
       return messages.settings.emailCodeExpired;
     case 'OTP_VERIFY_LIMIT':
     case 'OTP_RESEND_LIMIT':
-      return messages.settings.emailCodeLimit;
+    case 'LOGIN_RATE_LIMITED':
+      return messages.settings.tooManyAttempts;
     case 'OTP_RESEND_WAIT':
-      return messages.settings.emailError;
+      return messages.settings.emailResendWait;
     case 'AVATAR_TOO_LARGE':
     case 'ASSET_TOO_LARGE':
       return messages.settings.avatarTooLarge;

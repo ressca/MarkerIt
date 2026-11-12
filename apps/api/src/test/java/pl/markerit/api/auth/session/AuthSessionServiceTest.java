@@ -116,12 +116,14 @@ class AuthSessionServiceTest {
         UUID currentId = UUID.randomUUID();
         UserSession current = mock(UserSession.class);
         UserSession other = mock(UserSession.class);
+        UUID otherId = UUID.randomUUID();
         when(current.getId()).thenReturn(currentId);
-        when(other.getId()).thenReturn(UUID.randomUUID());
+        when(other.getId()).thenReturn(otherId);
         when(sessions.findByUser_IdAndRevokedAtIsNull(userId)).thenReturn(List.of(current, other));
 
-        service.revokeOtherSessions(userId, currentId);
+        List<UUID> revoked = service.revokeOtherSessions(userId, currentId);
 
+        assertEquals(List.of(otherId), revoked);
         verify(other).revoke(any(Instant.class));
         verify(current, never()).revoke(any(Instant.class));
         verify(sessions).save(other);

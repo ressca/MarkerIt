@@ -81,6 +81,11 @@ class ApiExceptionHandlerTest {
                 new InvalidRequestException("ASSET_TOO_LARGE", "Plik może mieć maksymalnie 10 MB."));
         assertEquals(413, serviceResponse.getStatusCode().value());
         assertEquals("ASSET_TOO_LARGE", serviceResponse.getBody().getProperties().get("code"));
+
+        var avatarResponse = handler.invalidRequest(
+                new InvalidRequestException("AVATAR_TOO_LARGE", "Avatar może mieć maksymalnie 5 MB."));
+        assertEquals(413, avatarResponse.getStatusCode().value());
+        assertEquals("AVATAR_TOO_LARGE", avatarResponse.getBody().getProperties().get("code"));
     }
 
     @Test void mapsVerificationAndRateLimitErrors() {

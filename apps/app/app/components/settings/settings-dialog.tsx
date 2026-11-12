@@ -72,6 +72,7 @@ export function toUiProfile(profile: UserProfileDto): UserProfile {
       profile.avatarAssetId != null
         ? assetContentUrl(profile.avatarAssetId)
         : undefined,
+    locale: profile.locale,
   };
 }
 
@@ -85,15 +86,18 @@ export function SettingsDialog({
   const [profile, setProfile] = useState<UserProfileDto | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const showLoading = loading || (open && !profile && !loadError);
   const profileUpdatedRef = useRef(onProfileUpdated);
   profileUpdatedRef.current = onProfileUpdated;
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
+    setProfile(null);
     try {
       const loaded = await getMyProfile();
       setProfile(loaded);
+      setAppLocale(loaded.locale);
       profileUpdatedRef.current?.(toUiProfile(loaded));
     } catch {
       setLoadError(true);
@@ -106,6 +110,13 @@ export function SettingsDialog({
     if (!open) return;
     void loadProfile();
   }, [open, loadProfile]);
+
+  useEffect(() => {
+    if (open) return;
+    setProfile(null);
+    setLoadError(false);
+    setLoading(false);
+  }, [open]);
 
   function handleProfileUpdate(updated: UserProfileDto) {
     setProfile(updated);
@@ -127,7 +138,7 @@ export function SettingsDialog({
           <DialogDescription>{messages.settings.description}</DialogDescription>
         </DialogHeader>
 
-        {loading ? (
+        {showLoading ? (
           <SettingsSkeleton messages={messages} />
         ) : loadError || !profile ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
@@ -164,7 +175,7 @@ export function SettingsDialog({
                   onProfileUpdated={handleProfileUpdate}
                 />
               </TabsContent>
-              <TabsContent value="security" className="mt-0">
+              <TabsContent value="security" className="mt-0" keepMounted>
                 <SecuritySettings
                   profile={profile}
                   onProfileUpdated={handleProfileUpdate}

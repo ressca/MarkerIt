@@ -6,5 +6,5 @@ import jakarta.validation.constraints.Size;
 
 public record ChangeEmailRequest(
         @NotBlank @Email @Size(max = 320) String newEmail,
-        @NotBlank String currentPassword) {
+        @NotBlank @Size(max = 72) String currentPassword) {
 }

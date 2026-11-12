@@ -14,7 +14,7 @@ import {
   setActiveWorkspaceId,
   setSidebarCollapsed,
 } from '../lib/projects-store';
-import { APP_LOCALE_KEY, setAppLocale } from '../lib/use-app-locale';
+import { setAppLocale } from '../lib/use-app-locale';
 import type { UserProfile, Workspace } from './types';
 
 interface AppShellProps {
@@ -102,15 +102,8 @@ export function AppShell({
   }, []);
 
   useEffect(() => {
-    if (!user.locale) return;
-    try {
-      if (!window.localStorage.getItem(APP_LOCALE_KEY)) {
-        setAppLocale(user.locale);
-      }
-    } catch {
-      // Storage may be unavailable; the default locale still applies.
-    }
-  }, [user.locale]);
+    if (user.locale) setAppLocale(user.locale);
+  }, [user.id, user.locale]);
 
   const toggleSidebar = useCallback(() => {
     setCollapsed((previous) => {
