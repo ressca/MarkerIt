@@ -8,6 +8,8 @@ interface SessionTokenPayload {
   id?: string;
   email?: string;
   name?: string;
+  avatar?: string;
+  locale?: string;
 }
 
 function decodePayload(token: string): SessionTokenPayload | null {
@@ -64,10 +66,21 @@ export async function getSessionUser(): Promise<UserProfile | null> {
     typeof payload?.name === 'string' && payload.name.trim().length > 0
       ? payload.name.trim()
       : displayNameFromEmail(email);
+  const avatarAssetId =
+    typeof payload?.avatar === 'string' && payload.avatar.trim().length > 0
+      ? payload.avatar.trim()
+      : null;
   return {
     id,
     email,
     displayName,
     initials: initialsFromName(displayName),
+    avatarUrl: avatarAssetId
+      ? `/api/assets/${encodeURIComponent(avatarAssetId)}/content`
+      : undefined,
+    locale:
+      typeof payload?.locale === 'string' && (payload.locale === 'pl' || payload.locale === 'en')
+        ? payload.locale
+        : undefined,
   };
 }

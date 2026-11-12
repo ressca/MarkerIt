@@ -99,6 +99,20 @@ Application routes:
 | `/projects/[projectId]/reviews/[reviewId]` | Version canvas, pins, discussion and approvals |
 | `/feedback` | Workspace feedback inbox: open and resolved pins from every project |
 
+Account settings open from the avatar menu as a large modal with **Profile**, **Security** and **Preferences** tabs. The profile tab supports a PNG/JPEG avatar (up to 5 MB) and display name; security covers password changes (current password required, other sessions are revoked) and email changes (current password plus a 6-digit code sent to the new address); preferences switch the interface between Polish and English and persist the choice on the account.
+
+Account API endpoints:
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET`, `PATCH` | `/users/me` | Read or update display name and locale |
+| `POST` | `/users/me/avatar` | Multipart `file`; PNG/JPEG, max 5 MB |
+| `DELETE` | `/users/me/avatar` | Remove the current avatar |
+| `POST` | `/users/me/password` | `{ currentPassword, newPassword }`; revokes other sessions |
+| `POST` | `/users/me/email` | `{ newEmail, currentPassword }`; sends a code to the new address |
+| `POST` | `/users/me/email/resend` | Resend the pending email-change code |
+| `POST` | `/users/me/email/verify` | `{ newEmail, code }`; updates the email and refreshes the session |
+
 The workspace feedback inbox reads `GET /api/v1/workspaces/{workspaceId}/feedback`, which returns visible pins from the latest version of every review in the workspace (including closed reviews) with project, thread, version and last-comment context. The page filters by status, project and free-text search, and can resolve or reopen a note inline when its review is still open.
 
 The review page subscribes to updates over a native STOMP WebSocket (no SockJS) at `/ws` and consumes `/topic/reviews/{reviewId}`. The API also publishes review, version and approval events on `/topic/projects/{projectId}`, but the current project page does not subscribe to that topic yet. The handshake reuses the `markerit_session` cookie. Event types are `PIN_CREATED`, `PIN_UPDATED`, `PIN_DELETED`, `COMMENT_CREATED`, `COMMENT_UPDATED`, `COMMENT_DELETED`, `REVIEW_CREATED`, `REVIEW_UPDATED`, `REVIEW_DELETED`, `VERSION_CREATED` and `APPROVAL_CREATED`.
