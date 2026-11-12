@@ -55,10 +55,15 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
       size="sm"
       className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-primary/40"
     >
-      {/* Top Banner / Preview Thumbnail */}
+      {/* The whole card is one link; the action menu sits above this overlay. */}
       <Link
         href={`/projects/${project.id}`}
         aria-label={project.name}
+        className="absolute inset-0 z-10 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      />
+
+      {/* Top Banner / Preview Thumbnail */}
+      <div
         className={cn(
           'relative flex h-32 w-full items-center justify-center overflow-hidden bg-gradient-to-br p-4 transition-transform group-hover:scale-[1.01]',
           gradient
@@ -106,7 +111,7 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
             {project.status}
           </Badge>
         </div>
-      </Link>
+      </div>
 
       {/* Card Content */}
       <CardContent className="flex flex-1 flex-col justify-between p-4">
@@ -114,9 +119,7 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
           <div className="flex items-start justify-between gap-2">
             <div>
               <h3 className="font-semibold text-base tracking-tight text-foreground group-hover:text-primary transition-colors">
-                <Link href={`/projects/${project.id}`} className="hover:underline">
-                  {project.name}
-                </Link>
+                {project.name}
               </h3>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {project.description || 'Brak opisu'}
@@ -124,6 +127,7 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
             </div>
 
             {/* Action menu */}
+            <div className="relative z-20">
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -163,6 +167,7 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            </div>
           </div>
         </div>
 

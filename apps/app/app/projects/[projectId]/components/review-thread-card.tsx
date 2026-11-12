@@ -31,7 +31,12 @@ export function ReviewThreadCard({
   const statusLabel = reviewStatusLabel(messages, review.status);
 
   return (
-    <Card className="overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
+    <Link
+      href={href}
+      aria-label={review.title}
+      className="block h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
+    <Card className="h-full overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-muted">
         <div aria-hidden="true" className="size-full">
           {asset ? (
@@ -61,9 +66,7 @@ export function ReviewThreadCard({
       <CardContent className="space-y-3 p-4">
         <div>
           <h3 className="text-base font-semibold tracking-tight text-foreground">
-            <Link href={href} className="hover:text-primary hover:underline">
-              {review.title}
-            </Link>
+            {review.title}
           </h3>
           {review.description && (
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{review.description}</p>
@@ -138,5 +141,6 @@ export function ReviewThreadCard({
         </div>
       </CardContent>
     </Card>
+    </Link>
   );
 }

@@ -53,27 +53,29 @@ export function ProjectRow({ project, onStatusChange, onDelete }: ProjectRowProp
   return (
     <article
       className={cn(
-        'group flex flex-col gap-3 rounded-xl border border-border border-l-4 bg-card p-3.5 transition-all duration-150 hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between',
+        'group relative flex flex-col gap-3 rounded-xl border border-border border-l-4 bg-card p-3.5 transition-all duration-150 hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between',
         borderClass
       )}
     >
+      <Link
+        href={`/projects/${project.id}`}
+        aria-label={project.name}
+        className="absolute inset-0 z-10 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      />
+
       {/* Title & Info */}
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 font-bold text-xs text-primary ring-1 ring-primary/20">
           m.
         </div>
-        <Link
-          href={`/projects/${project.id}`}
-          aria-label={project.name}
-          className="min-w-0 flex-1"
-        >
+        <div className="min-w-0 flex-1">
           <strong className="block truncate font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
             {project.name}
           </strong>
           <small className="block truncate text-xs text-muted-foreground">
             {project.workspace}
           </small>
-        </Link>
+        </div>
       </div>
 
       {/* Badges, comments, members & timestamp */}
@@ -133,6 +135,7 @@ export function ProjectRow({ project, onStatusChange, onDelete }: ProjectRowProp
         </span>
 
         {/* Action Menu */}
+        <div className="relative z-20">
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
@@ -173,6 +176,7 @@ export function ProjectRow({ project, onStatusChange, onDelete }: ProjectRowProp
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </div>
     </article>
   );
