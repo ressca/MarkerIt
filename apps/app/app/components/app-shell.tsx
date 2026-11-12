@@ -21,6 +21,8 @@ interface AppShellProps {
   workspaceId?: string;
   breadcrumbs: BreadcrumbItem[];
   children: ReactNode;
+  /** Highlights the matching sidebar entry; defaults to the projects view. */
+  activeTab?: string;
 }
 
 interface SidebarStats {
@@ -32,7 +34,13 @@ interface SidebarStats {
 
 const EMPTY_STATS: SidebarStats = { projects: 0, shared: 0, closed: 0, comments: 0 };
 
-export function AppShell({ user, workspaceId, breadcrumbs, children }: AppShellProps) {
+export function AppShell({
+  user,
+  workspaceId,
+  breadcrumbs,
+  children,
+  activeTab = 'projekty',
+}: AppShellProps) {
   const router = useRouter();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState(workspaceId ?? '');
@@ -134,11 +142,11 @@ export function AppShell({ user, workspaceId, breadcrumbs, children }: AppShellP
   }
 
   const sidebarProps = {
-    activeTab: '',
-    onTabChange: (tab: string) => {
-      router.push(tab === 'shared' ? '/#shared' : '/#projekty');
-      setMobileMenuOpen(false);
-    },
+    activeTab,
+    // Navigation is handled by the sidebar links themselves. Pushing here as
+    // well would resolve hash-only hrefs against the current page and could
+    // strand the user on a non-dashboard route.
+    onTabChange: () => setMobileMenuOpen(false),
     projectCount: stats.projects,
     sharedCount: stats.shared,
     closedCount: stats.closed,

@@ -97,6 +97,9 @@ Application routes:
 | --- | --- |
 | `/projects/[projectId]` | Project photo library and review-thread list |
 | `/projects/[projectId]/reviews/[reviewId]` | Version canvas, pins, discussion and approvals |
+| `/feedback` | Workspace feedback inbox: open and resolved pins from every project |
+
+The workspace feedback inbox reads `GET /api/v1/workspaces/{workspaceId}/feedback`, which returns visible pins from the latest version of every review in the workspace (including closed reviews) with project, thread, version and last-comment context. The page filters by status, project and free-text search, and can resolve or reopen a note inline when its review is still open.
 
 The review page subscribes to updates over a native STOMP WebSocket (no SockJS) at `/ws` and consumes `/topic/reviews/{reviewId}`. The API also publishes review, version and approval events on `/topic/projects/{projectId}`, but the current project page does not subscribe to that topic yet. The handshake reuses the `markerit_session` cookie. Event types are `PIN_CREATED`, `PIN_UPDATED`, `PIN_DELETED`, `COMMENT_CREATED`, `COMMENT_UPDATED`, `COMMENT_DELETED`, `REVIEW_CREATED`, `REVIEW_UPDATED`, `REVIEW_DELETED`, `VERSION_CREATED` and `APPROVAL_CREATED`.
 

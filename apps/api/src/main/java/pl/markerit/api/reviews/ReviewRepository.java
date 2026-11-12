@@ -1,6 +1,7 @@
 package pl.markerit.api.reviews;
 
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,9 @@ import org.springframework.data.repository.query.Param;
 public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     List<Review> findByProjectIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(UUID projectId);
+
+    List<Review> findByProjectIdInAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(
+            Collection<UUID> projectIds);
 
     Optional<Review> findByIdAndDeletedAtIsNull(UUID id);
 

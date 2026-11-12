@@ -12,5 +12,8 @@ public interface PinRepository extends JpaRepository<Pin, UUID> {
 
     List<Pin> findByReviewVersionIdIn(Collection<UUID> reviewVersionIds);
 
+    List<Pin> findByReviewVersionIdInAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(
+            Collection<UUID> reviewVersionIds);
+
     Optional<Pin> findByIdAndDeletedAtIsNull(UUID id);
 }

@@ -176,6 +176,7 @@ All routes are under `/api/v1` and require an authenticated session unless noted
 | `POST` | `/workspaces` | Limit 3 |
 | `GET`, `PATCH`, `DELETE` | `/workspaces/{workspaceId}` | |
 | `GET` | `/workspaces/{workspaceId}/members` | Used for reviewer selection |
+| `GET` | `/workspaces/{workspaceId}/feedback` | Workspace feedback inbox: latest-version pins from every project |
 
 ### Projects and assets
 

@@ -79,21 +79,28 @@ export function Sidebar({
       label: 'Projekty',
       icon: FolderKanban,
       count: projectCount,
-      href: '#projekty',
+      href: '/#projekty',
+    },
+    {
+      id: 'feedback',
+      label: 'Uwagi',
+      icon: MessageSquare,
+      count: commentsCount,
+      href: '/feedback',
     },
     {
       id: 'shared',
       label: 'Udostępnione',
       icon: Share2,
       count: sharedCount,
-      href: '#projekty',
+      href: '/#shared',
     },
     {
       id: 'archive',
       label: 'Archiwum',
       icon: Archive,
       count: closedCount,
-      href: '#projekty',
+      href: '/#archive',
     },
   ];
 
@@ -202,7 +209,7 @@ export function Sidebar({
                   <Tooltip key={item.id}>
                     <TooltipTrigger
                       render={
-                        <a
+                        <Link
                           href={item.href}
                           onClick={() => onTabChange?.(item.id)}
                           className={cn(
@@ -212,9 +219,10 @@ export function Sidebar({
                               : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                           )}
                           aria-label={item.label}
+                          aria-current={isActive ? 'page' : undefined}
                         >
                           <Icon className="size-4" />
-                        </a>
+                        </Link>
                       }
                     />
                     <TooltipContent side="right">
@@ -225,10 +233,11 @@ export function Sidebar({
               }
 
               return (
-                <a
+                <Link
                   key={item.id}
                   href={item.href}
                   onClick={() => onTabChange?.(item.id)}
+                  aria-current={isActive ? 'page' : undefined}
                   className={cn(
                     'group flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-all duration-150',
                     isActive
@@ -256,7 +265,7 @@ export function Sidebar({
                   >
                     {item.count}
                   </Badge>
-                </a>
+                </Link>
               );
             })}
           </nav>
