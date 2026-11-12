@@ -24,6 +24,8 @@ interface AppShellProps {
   children: ReactNode;
   /** Highlights the matching sidebar entry; defaults to the projects view. */
   activeTab?: string;
+  /** Overrides the sidebar feedback badge, e.g. with open notes on `/feedback`. */
+  feedbackCount?: number;
 }
 
 interface SidebarStats {
@@ -41,6 +43,7 @@ export function AppShell({
   breadcrumbs,
   children,
   activeTab = 'projekty',
+  feedbackCount,
 }: AppShellProps) {
   const router = useRouter();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -155,7 +158,7 @@ export function AppShell({
     projectCount: stats.projects,
     sharedCount: stats.shared,
     closedCount: stats.closed,
-    commentsCount: stats.comments,
+    commentsCount: feedbackCount ?? stats.comments,
     workspaces,
     currentWorkspaceId: currentWorkspace?.id,
     onWorkspaceChange: handleWorkspaceChange,

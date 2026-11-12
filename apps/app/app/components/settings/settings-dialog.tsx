@@ -207,7 +207,7 @@ function SettingsTabTrigger({
   return (
     <TabsTrigger
       value={value}
-      className="justify-start gap-2 whitespace-nowrap px-3 py-2 data-[selected]:bg-background data-[selected]:text-foreground data-[selected]:shadow-2xs md:w-full"
+      className="justify-start gap-2 whitespace-nowrap px-3 py-2 data-[active]:bg-background data-[active]:text-foreground data-[active]:shadow-2xs md:w-full"
     >
       <span className="[&>svg]:size-4">{icon}</span>
       {label}

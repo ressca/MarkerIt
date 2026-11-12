@@ -308,6 +308,7 @@ export function FeedbackPage({
       user={initialUser}
       workspaceId={activeWorkspaceId || undefined}
       activeTab="feedback"
+      feedbackCount={openCount}
       breadcrumbs={[{ label: messages.feedback.breadcrumb }]}
     >
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 pb-16 sm:px-8">

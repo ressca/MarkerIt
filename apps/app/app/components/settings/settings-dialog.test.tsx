@@ -75,6 +75,10 @@ describe('SettingsDialog', () => {
 
     const input = await screen.findByLabelText('Nazwa wyświetlana');
     expect(input).toHaveValue('Anna Kowalska');
+    expect(screen.getByRole('tab', { name: 'Profil' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
 
     await browser.clear(input);
     await browser.type(input, 'Anna Nowak');
@@ -131,6 +135,10 @@ describe('SettingsDialog', () => {
 
     await screen.findByLabelText('Nazwa wyświetlana');
     await browser.click(screen.getByRole('tab', { name: 'Bezpieczeństwo' }));
+    expect(screen.getByRole('tab', { name: 'Bezpieczeństwo' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
 
     await browser.type(screen.getByLabelText('Aktualne hasło'), 'current-password');
     await browser.type(screen.getByLabelText('Nowe hasło'), 'new-password');
